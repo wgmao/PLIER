@@ -32,6 +32,7 @@ plierRes=PLIER(data=HCCdataUse, HCCpath[cmHCC,],svdres=svdresHCC, k=52, L1=25, m
 plotMat(plierRes$U)
 #check for a CTNNB1 mutation correlation
 #these are activating mutations so excpect a positive correlation
+data(CTNNB1mut)
 plot(sort(corRes<-cor(t(plierRes$B), CTNNB1mut[cmSurvival], use = "p")), xlab="LV", ylab="Correlation with CTNNB1 mutation")
 #and the correlated LV is
 iBest=which(corRes==max(corRes))
