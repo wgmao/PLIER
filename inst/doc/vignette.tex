@@ -1,0 +1,112 @@
+\documentclass{article}
+
+\usepackage{Sweave}
+\begin{document}
+\input{vignette-concordance}
+\begin{Schunk}
+\begin{Sinput}
+> library(PLIER)
+\end{Sinput}
+\end{Schunk}
+\section{HCC Dataset}
+Load data
+\begin{Schunk}
+\begin{Sinput}
+> data(HCCdata)
+> data(canonicalPathways)
+> data(chemgenPathways)
+> data(oncogenicPathways)
+\end{Sinput}
+\end{Schunk}
+Construct a joint pathway matrix by merging canonicalPathways, chemgenPathways and oncogenicPathways and select genes appearing in both gene expression profile and the joint pathway matrix.
+\begin{Schunk}
+\begin{Sinput}
+> HCCpath=combineGSmats(canonicalPathways, chemgenPathways, oncogenicPathways)
+> cmHCC=commonRows(HCCdata, HCCpath)
+\end{Sinput}
+\end{Schunk}
+Remove small pathways, not strictly necessary but saves computation time by making the pathway/geneset matrix smaller
+\begin{Schunk}
+\begin{Sinput}
+> ii=which(colSums(HCCpath[cmHCC,])<20)
+> HCCpath=HCCpath[, -ii]
+\end{Sinput}
+\end{Schunk}
+Prescale the data
+\begin{Schunk}
+\begin{Sinput}
+> HCCdataUse=rowNorm(HCCdata[cmHCC,cmSurvival])
+\end{Sinput}
+\end{Schunk}
+Precompute the SVD for starting priorPCA and for comparison
+\begin{Schunk}
+\begin{Sinput}
+> svdresHCC=svd(HCCdataUse)
+\end{Sinput}
+\end{Schunk}
+Compute the number of latent variables by num.pc(HCCdataUse) and the result is 52. Then set max.iter = 250, L1 = 25, k = 52 and all other parameters are default.
+\begin{Schunk}
+\begin{Sinput}
+> plierRes=PLIER(data=HCCdataUse, HCCpath[cmHCC,],svdres=svdresHCC, k=52, L1=25, max.iter=250, trace=T)
+\end{Sinput}
+\begin{Soutput}
+[1] "L2 is set to 283.480769230769"
+\end{Soutput}
+\begin{Sinput}
+> plotMat(plierRes$U)
+\end{Sinput}
+\end{Schunk}
+Check for a CTNNB1 mutation correlation. These are activating mutations so excpect a positive correlation
+\begin{Schunk}
+\begin{Sinput}
+> data(CTNNB1mut)
+> plot(sort(corRes<-cor(t(plierRes$B), CTNNB1mut[cmSurvival], use = "p")), xlab="LV", ylab="Correlation with CTNNB1 mutation")
+\end{Sinput}
+\end{Schunk}
+The correlated LV is
+\begin{Schunk}
+\begin{Sinput}
+> iBest=which(corRes==max(corRes))
+\end{Sinput}
+\end{Schunk}
+Check the associated pathways
+\begin{Schunk}
+\begin{Sinput}
+> which(plierRes$U[,iBest]>0)
+\end{Sinput}
+\begin{Soutput}
+    CHIANG_LIVER_CANCER_SUBCLASS_CTNNB1_UP 
+                                       629 
+       BOYAULT_LIVER_CANCER_SUBCLASS_G6_UP 
+                                      2263 
+CHIANG_LIVER_CANCER_SUBCLASS_INTERFERON_DN 
+                                      2924 
+\end{Soutput}
+\end{Schunk}
+Check survival
+\begin{Schunk}
+\begin{Sinput}
+> survRaw=testSurvival(plierRes$B, survTime, survStatus)
+\end{Sinput}
+\end{Schunk}
+Include the first 10 PCs from the SVD to correct for global subtype structure
+\begin{Schunk}
+\begin{Sinput}
+> survCor=testSurvival(plierRes$B, survTime, survStatus, t(svdresHCC$v[, 1:10]))
+\end{Sinput}
+\end{Schunk}
+Plot survival predictors
+\begin{Schunk}
+\begin{Sinput}
+> iiSurv=which(survRaw$q.value<0.2)
+> plotMat(plierRes$U[,iiSurv])
+\end{Sinput}
+\end{Schunk}
+Plot structure corrected survival predictors
+\begin{Schunk}
+\begin{Sinput}
+> iiSurv=which(survCor$q.value<0.2)
+> plotMat(plierRes$U[,iiSurv])
+\end{Sinput}
+\end{Schunk}
+\end{document}

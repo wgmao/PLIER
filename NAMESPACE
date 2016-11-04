@@ -1,0 +1,5 @@
+exportPattern("^[[:alpha:]]+")
+import(qvalue)
+import(RColorBrewer)
+import(pheatmap)
+import(survival)

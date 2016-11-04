@@ -1,0 +1,70 @@
+\documentclass{article}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+<<>>=
+library(PLIER)
+@
+\section{HCC Dataset}
+Load data
+<<echo=TRUE>>=
+data(HCCdata)
+data(canonicalPathways)
+data(chemgenPathways)
+data(oncogenicPathways)
+@
+Construct a joint pathway matrix by merging canonicalPathways, chemgenPathways and oncogenicPathways and select genes appearing in both gene expression profile and the joint pathway matrix.
+<<echo=TRUE>>=
+HCCpath=combineGSmats(canonicalPathways, chemgenPathways, oncogenicPathways)
+cmHCC=commonRows(HCCdata, HCCpath)
+@
+Remove small pathways, not strictly necessary but saves computation time by making the pathway/geneset matrix smaller
+<<echo=TRUE>>=
+ii=which(colSums(HCCpath[cmHCC,])<20)
+HCCpath=HCCpath[, -ii]
+@
+Prescale the data
+<<echo=TRUE>>=
+HCCdataUse=rowNorm(HCCdata[cmHCC,cmSurvival])
+@
+Precompute the SVD for starting priorPCA and for comparison
+<<echo=TRUE>>=
+svdresHCC=svd(HCCdataUse)
+@
+Compute the number of latent variables by num.pc(HCCdataUse) and the result is 52. Then set max.iter = 250, L1 = 25, k = 52 and all other parameters are default.
+<<echo=TRUE>>=
+plierRes=PLIER(data=HCCdataUse, HCCpath[cmHCC,],svdres=svdresHCC, k=52, L1=25, max.iter=250, trace=T)
+plotMat(plierRes$U)
+@
+Check for a CTNNB1 mutation correlation. These are activating mutations so excpect a positive correlation
+<<echo=TRUE>>=
+data(CTNNB1mut)
+plot(sort(corRes<-cor(t(plierRes$B), CTNNB1mut[cmSurvival], use = "p")), xlab="LV", ylab="Correlation with CTNNB1 mutation")
+@
+The correlated LV is
+<<echo=TRUE>>=
+iBest=which(corRes==max(corRes))
+@
+Check the associated pathways
+<<echo=TRUE>>=
+which(plierRes$U[,iBest]>0)
+@
+Check survival
+<<echo=TRUE>>=
+survRaw=testSurvival(plierRes$B, survTime, survStatus)
+@
+Include the first 10 PCs from the SVD to correct for global subtype structure
+<<echo=TRUE>>=
+survCor=testSurvival(plierRes$B, survTime, survStatus, t(svdresHCC$v[, 1:10]))
+@
+Plot survival predictors
+<<echo=TRUE>>=
+iiSurv=which(survRaw$q.value<0.2)
+plotMat(plierRes$U[,iiSurv])
+@
+Plot structure corrected survival predictors
+<<echo=TRUE>>=
+iiSurv=which(survCor$q.value<0.2)
+plotMat(plierRes$U[,iiSurv])
+@
+\end{document}
