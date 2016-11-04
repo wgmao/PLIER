@@ -28,7 +28,7 @@ svdresHCC=svd(HCCdataUse)
 #num.pc(HCCdataUse)
 #the result if 52
 #setting max.iter=250, L1=25, k=52, all other parameters are default
-plierRes=PLIER(data=HCCdataUse, HCCpath[cmHCC,],svdres=svdresHCC, k=52, L1=25, trace=T)
+plierRes=PLIER(data=HCCdataUse, HCCpath[cmHCC,],svdres=svdresHCC, k=52, L1=25, max.iter=250, trace=T)
 plotMat(plierRes$U)
 #check for a CTNNB1 mutation correlation
 #these are activating mutations so excpect a positive correlation
