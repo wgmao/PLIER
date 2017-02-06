@@ -1,0 +1,6 @@
+exportPattern("^[[:alpha:]]+")
+import(RColorBrewer)
+import(gplots)
+import(pheatmap)
+import(glmnet)
+

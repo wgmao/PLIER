@@ -1,0 +1,88 @@
+\documentclass{article}
+
+\begin{document}
+\SweaveOpts{concordance=TRUE}
+<<>>=
+library(PLIER)
+@
+\section{Vaccination Dataset}
+Load data
+<<echo=TRUE>>=
+data(bloodCellMarkersIRISDMAP)
+data(svmMarkers)
+data(canonicalPathways)
+data(vacData)
+@
+Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersIRISDMAP and svmMarkers and select genes appearing in both gene expression profile and the joint pathway matrix.
+<<echo=TRUE>>=
+allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers,canonicalPathways)
+cm.genes=commonRows(allPaths, vacData)
+@
+Normalize the data and count the number of latent variables in the data by num.pc(). The result is 24. Then set max.iter = 250, k = 24 and all other parameters to be default.
+<<echo=TRUE>>=
+vacDataN=rowNorm(vacData)
+num.pc(vacDataN[cm.genes,])
+plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=24, trace=T, max.iter=150)
+@
+We correlate the decomposition result with SPVs from CellCODE. We have nice one-to-one  correspondence, though the "DendriticCell" signature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
+<<echo=TRUE>>=
+data(SPVs)
+plotMat(cor(t(plierResult$B), SPVs))
+@
+Visualize the cross-validation results
+<<echo=TRUE>>=
+plotMat(plierResult$Uauc)
+@
+Plot all of U and visualize the top genes
+<<echo=TRUE>>=
+plotU(plierResult,auc.cutoff = 0.5, pval.cutoff = 1)
+plotTopZ(plierResult, vacDataN, allPaths, top = 10)
+@
+The "PID_ATF2_PATHWAY" looks a little tenuous and we can check its statistics.
+<<echo=TRUE>>=
+plierResult$summary[which(plierResult$summary$`LV index`==3),]
+@
+The association with "PID_ATF2_PATHWAY" is not significant: this pathway has only 42 genes that are also present in the dataset which makes achieving significance harder. In general, the signaling pathway  doesn't have perfect correspondence to the transcriptional signature, but the transcriptional signature can still be of interest and we can plot it by itself with more genes. It looks like an AP1 pathway that regulates IL8 transcription possibly downstream of TNF signaling (we have FOS, JUNB, FOSB (not actually a memeber of the PID_ATF2_PATHWAY geneset))
+<<echo=TRUE>>=
+plotTopZ(plierResult, vacDataN, allPaths, index=c(3), top=50)
+@
+\section{HCC Dataset}
+Load data
+<<echo=TRUE>>=
+data(HCCdataTumor)
+data(canonicalPathways)
+data(chemgenPathways)
+data(oncogenicPathways)
+@
+Construct a joint pathway matrix by merging canonicalPathways, chemgenPathways and oncogenicPathways and select genes appearing in both gene expression profile and the joint pathway matrix.
+<<echo=TRUE>>=
+CancerPath=combinePaths(canonicalPathways, chemgenPathways, oncogenicPathways)
+cmHCC=commonRows(HCCdataTumor, CancerPath)
+
+@
+Remove small pathways, not strictly necessary but saves computation time by making the pathway/geneset matrix smaller
+<<echo=TRUE>>=
+ii=which(colSums(CancerPath[cmHCC,])<20)
+HCCpath=CancerPath[, -ii]
+@
+Prescale the data
+<<echo=TRUE>>=
+HCCdataN=rowNorm(HCCdataTumor[cmHCC,])
+@
+Precompute Chat, which is used to define active pathways and is expensive for large pathway sets. It's helpful if we want to run plier with different parameters
+<<echo=TRUE>>=
+HCCchat=computeChat(CancerPath[cmHCC,])
+@
+Compute the number of latent variables by num.pc(HCCdataUse) and the result is 52. Then set k = 52 and all other parameters to be default.
+<<echo=TRUE>>=
+plierResultHCC=PLIER(HCCdataN, CancerPath[cmHCC,], k = 52, Chat = HCCchat, trace=T)
+@
+Plot the result with a high AUC cutoff so it is not too busy
+<<echo=TRUE>>=
+plotU(plierResultHCC, auc.cutoff = 0.9)
+@
+We found two immune components, interferon alpha and genes related to interferon gamma/CD8/Th1 response. The component 40 has many pathways, it is named with the top pathway but "inPathway" refers to their union.
+<<echo=TRUE>>=
+plotTopZ(plierResultHCC, HCCdataN, CancerPath, index=c(26, 40), top = 20)
+@
+\end{document}
