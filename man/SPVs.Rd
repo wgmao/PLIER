@@ -1,6 +1,6 @@
 \name{SPVs}
 \alias{SPVs}
-\docType{SPVs}
+\docType{data}
 \title{
 Surrogate Proportion Variables
 }
