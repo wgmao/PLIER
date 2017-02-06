@@ -1,4 +1,5 @@
 # PLIER
+Pathway-Level Information Extractor (PLIER): a generative model for gene expression data
 
 Library dependencies
 
