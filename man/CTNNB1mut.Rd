@@ -5,7 +5,7 @@
 Immune Markers (Clinical Pathways)
 }
 \description{
-This pathway dataset contains one immune marker, CTNNB1, which contains 371 samples.
+A vector of CTNNB1 mutation status for the samples in HCCdataTumor.
 }
 \usage{data(CTNNB1mut)}
 \format{

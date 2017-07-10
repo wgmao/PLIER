@@ -27,11 +27,11 @@ Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersI
 allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers,canonicalPathways)
 cm.genes=commonRows(allPaths, vacData)
 @
-Normalize the data and count the number of latent variables in the data by num.pc(). The result is 24. Then set max.iter = 150, k = 24 and all other parameters to be default. Note: num.pc() is quite conservative and there is no harm in setting this value higher.
+Normalize the data and count the number of latent variables in the data by num.pc(). The result is 24. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=32 and all other parameters to be default.
 <<echo=TRUE>>=
 vacDataN=rowNorm(vacData)
 num.pc(vacDataN[cm.genes,])
-#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=24, trace=T, max.iter=150)
+#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=32, trace=T)
 @
 In the interest of speed we provide a pre-computed version
 <<echo=TRUE>>=
@@ -40,7 +40,7 @@ data(plierResult)
 We correlate the decomposition result with SPVs from CellCODE. We have nice one-to-one  correspondence, though the "DendriticCell" signature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
 <<echo=TRUE>>=
 data(SPVs)
-plotMat(cor(t(plierResult$B), SPVs))
+plotMat(cor(t(plierResult$B), SPVs), scale = F)
 @
 Visualize the U matrix with default cutoffs
 <<echo=TRUE>>=
@@ -51,62 +51,10 @@ Visualize the U matrix with more permissive cutoffs
 plotU(plierResult, auc.cutoff = 0.6, pval.cutoff = 0.05, top = 3)
 @
 
-Visualize the top genes
+Visualize the top genes and their pathway associations. Note: only LVs with pathway association are plotted.
 <<echo=TRUE>>=
-plotTopZ(plierResult, vacDataN, allPaths, top = 5)
-@
-The "PID\_ATF2\_PATHWAY" and "REACTOME\_MRNA\_PROCESSING" looks a little tenuous and we can check the statistics.
-<<echo=TRUE>>=
-plierResult$summary[which(plierResult$summary$`LV index`==3),]
-plierResult$summary[which(plierResult$summary$`LV index`==4),]
-@
-These pathways are not perfectly associated with LVs but are significant. This is typical for transcriptional pathways. To get a closer look at the genes we can visualize just these 
-<<echo=TRUE>>=
-plotTopZ(plierResult, vacDataN, allPaths, index=c(3,4), top=25)
-@
-\section{HCC Dataset}
-Load data
-<<echo=TRUE>>=
-data(HCCdata)
-data(canonicalPathways)
-data(chemgenPathways)
-data(oncogenicPathways)
-@
-Construct a joint pathway matrix by merging canonicalPathways, chemgenPathways and oncogenicPathways and select genes appearing in both gene expression profile and the joint pathway matrix.
-<<echo=TRUE>>=
-CancerPath=combinePaths(canonicalPathways, chemgenPathways, oncogenicPathways)
-cmHCC=commonRows(HCCdata, CancerPath)
-
-@
-Remove small pathways, not strictly necessary but saves computation time by making the pathway/geneset matrix smaller
-<<echo=TRUE>>=
-ii=which(colSums(CancerPath[cmHCC,])<20)
-HCCpath=CancerPath[, -ii]
-@
-Prescale the data
-<<echo=TRUE>>=
-HCCdataN=rowNorm(HCCdata[cmHCC,])
-@
-Pre-compute Chat, which is used to define active pathways and is expensive for large pathway sets. It's helpful if we want to run PLIER with different parameters
-<<echo=TRUE>>=
-HCCchat=computeChat(CancerPath[cmHCC,])
-@
-Compute the number of latent variables by num.pc(HCCdataN) and the result is 52. Then set k = 52 and all other parameters to be default.
-<<echo=TRUE>>=
-#plierResultHCC=PLIER(HCCdataN, CancerPath[cmHCC,], k = 52, Chat = HCCchat, trace=T)
-@
-Again, in the interest of speed we provide a pre-computed version
-<<echo=TRUE>>=
-data(plierResultHCC)
+plotTopZ(plierResult, vacDataN, allPaths, top = 15, index = 1:5)
 @
 
-Plot the result with a high AUC cutoff so it is not too busy
-<<echo=TRUE>>=
-plotU(plierResultHCC, auc.cutoff = 0.85, top=5)
-@
-We found two immune components, interferon alpha (LV26) and genes related to interferon gamma/CD8/Th1 response (LV4). 
-<<echo=TRUE>>=
-plotTopZ(plierResultHCC, HCCdataN, CancerPath, index=c(26, 40), top = 20)
-@
-LV40  has many associated pathways, it is named with the top pathway but "inPathway" refers to their union.
+
 \end{document}

@@ -5,7 +5,7 @@
 Blood cell markers
 }
 \description{
-This dataset contains 1,726 blood cell markers and 61 types of cell lines.
+This dataset contains 61 cell type markers derived from the IRIS and DMAP datasets plus a custom Treg geneset
 }
 \usage{data(bloodCellMarkersIRISDMAP)}
 \format{
