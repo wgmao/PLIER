@@ -160,16 +160,17 @@ crossVal=function(plierRes, data, priorMat){
 #' @param glm_alpha Set the alpha for elastic-net
 #' @export
 
-PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9){
+PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=20, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9){
   
   
-  solveU=function(Z, Us,priorMat, selection, L3, penalty.factor, glm_alpha){
+  solveU=function(Z, Us,priorMat,  L3, penalty.factor, glm_alpha){
     
   
     ii=which(apply(Us,1,min)<=maxPath)
     U=copyMat(Us)
     U[]=0
     for (j in 1:ncol(U)){
+      selection=which(Us[,j]<=maxPath)
       tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor)
       U[selection,j]=as.numeric(tmp$beta)
     }
@@ -281,23 +282,51 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
       
       biter=0
       
-      L3_1=0.000001
-      L3_2=1
+    
       if(abs(frac-curfrac)>1/k){
+        #set up the limits
+          if(curfrac>frac){
+            #increase penatly
+            if(is.null(L3)){
+              L3_1=0.000001
+              L3_2=1
+            }
+            else{
+              L3_1=L3
+              L3_2=L3*10
+            }
+          }
+          else{
+            #decrease
+            if(is.null(L3)){
+              print("First time")
+              L3_1=0.000001
+              L3_2=1
+            }
+            else{
+              L3_1=L3/10
+              L3_2=L3
+            }
+          }
+          
+    
         while (biter < 150&(biter<1|abs(frac-curfrac)>1/k|npos==0)){
           
-          U=solveU(Z, Us, priorMat, ii, L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
+          U=solveU(Z, Us, priorMat,  L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
+          
           nposlast=npos
           curfrac=(npos<-sum(apply(U,2,max)>0))/k
           message(paste0(npos, " positive columns at L3=", round(L3use,6)))
           if(curfrac>frac){
             #increase penatly
-            L3_1=(L3_1+L3_2)/2
+              L3_1=(L3_1+L3_2)/2
           }
           else{
             #decrease
-            L3_2=(L3_1+L3_2)/2 
+              L3_2=(L3_1+L3_2)/2
+            
           }
+       
           biter=biter+1
           #show(c(npos, nposlast, frac, curfrac, abs(frac-curfrac), 1/k))
         }
@@ -312,7 +341,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
 
       #find the active pathways
       ii=which(apply(Us,1,min)<=maxPath)
-      U=solveU(Z, Us, priorMat, ii, L3, penalty.factor, glm_alpha)
+      U=solveU(Z, Us, priorMat, L3, penalty.factor, glm_alpha)
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       Z1=Y%*%t(B)
       Z2=L1*C%*%U
@@ -395,7 +424,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
 #' @param sort.row do not custer the matrix but instead sort it to display the positive values close do the 'diagonal'
 #' @param ... options to be passed to pheatmap
 #' @export
-plotU=function(plierRes, auc.cutoff=0.6, pval.cutoff=1e-05, indexCol=NULL, indexRow=NULL, top=3, sort.row=F,...){
+plotU=function(plierRes, auc.cutoff=0.6, pval.cutoff=1e-03, indexCol=NULL, indexRow=NULL, top=3, sort.row=F,...){
   if(is.null(indexCol)){
     indexCol=1:ncol(plierRes$U)
   }
