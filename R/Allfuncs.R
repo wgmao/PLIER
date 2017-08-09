@@ -299,6 +299,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
           else{
             #decrease
             if(is.null(L3)){
+
               L3_1=0.000001
               L3_2=1
             }
