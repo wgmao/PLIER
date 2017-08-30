@@ -293,7 +293,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
             }
             else{
               L3_1=L3
-              L3_2=L3*10
+              L3_2=L3*100
             }
           }
           else{
@@ -304,7 +304,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
               L3_2=1
             }
             else{
-              L3_1=L3/10
+              L3_1=L3/100
               L3_2=L3
             }
           }
