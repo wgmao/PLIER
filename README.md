@@ -20,3 +20,6 @@ To install the R package
 library(devtools)
 install_github("wgmao/PLIER")
 ```
+
+Check out the vignette [here](vignettes/vignette.pdf)
+
