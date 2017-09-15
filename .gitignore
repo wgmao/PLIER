@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.Rbuildignore
+.gitignore~
+**.local_bash_history.txt
+**.Rhisotry
+*.Rproj
+inst/doc
+vignettes/*
+!vignettes/*Rnw
