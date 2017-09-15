@@ -33,7 +33,7 @@ vacDataN=rowNorm(vacData)
 num.pc(vacDataN[cm.genes,])
 #plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=24, trace=T, max.iter=150)
 @
-In the interest of speed we provide a pre-computed version
+In the interest of speed we provide a pre-computed version. (Note that for large datasets, with more than 500 samples, the results are not always exactly the same due to a randomized svd used for internal calculations.) If randomized svd is used a warning will be issues.
 <<echo=TRUE>>=
 data(plierResult)
 @

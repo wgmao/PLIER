@@ -4,7 +4,7 @@
 \alias{plotU}
 \title{plot the U matrix from a PLIER decomposition}
 \usage{
-plotU(plierRes, auc.cutoff = 0.6, pval.cutoff = 1e-05, indexCol = NULL,
+plotU(plierRes, auc.cutoff = 0.6, pval.cutoff = 0.001, indexCol = NULL,
   indexRow = NULL, top = 3, sort.row = F, ...)
 }
 \arguments{

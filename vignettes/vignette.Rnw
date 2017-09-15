@@ -27,21 +27,17 @@ Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersI
 allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers,canonicalPathways)
 cm.genes=commonRows(allPaths, vacData)
 @
-Normalize the data and count the number of latent variables in the data by num.pc(). The result is 24. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=32 and all other parameters to be default.
+Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 26. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=34 and all other parameters to be default.
 <<echo=TRUE>>=
 vacDataN=rowNorm(vacData)
-num.pc(vacDataN[cm.genes,])
-#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=32, trace=T)
+num.pc(vacDataN)
+#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T)
 @
-In the interest of speed we provide a pre-computed version
+In the interest of speed we provide a pre-computed version though for this example it will only take a around a minute.
 <<echo=TRUE>>=
 data(plierResult)
 @
-We correlate the decomposition result with SPVs from CellCODE. We have nice one-to-one  correspondence, though the "DendriticCell" signature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
-<<echo=TRUE>>=
-data(SPVs)
-plotMat(cor(t(plierResult$B), SPVs), scale = F)
-@
+
 Visualize the U matrix with default cutoffs
 <<echo=TRUE>>=
 plotU(plierResult, auc.cutoff = 0.75, pval.cutoff = 0.01, top = 3)
@@ -51,9 +47,35 @@ Visualize the U matrix with more permissive cutoffs
 plotU(plierResult, auc.cutoff = 0.6, pval.cutoff = 0.05, top = 3)
 @
 
-Visualize the top genes and their pathway associations. Note: only LVs with pathway association are plotted.
+We can correlate the decomposition result with SPVs from CellCODE like this.
 <<echo=TRUE>>=
-plotTopZ(plierResult, vacDataN, allPaths, top = 15, index = 1:5)
+data(SPVs)
+plotMat(cor(t(plierResult$B), SPVs), scale = F)
+@
+ We have nice one-to-one  correspondence, though the "DendriticCell"ignature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
+
+We can see that LVs  1, 8, 9, 11, 16, 21, 33  roughly correspond to major cell-types and we can use this to derive data-driven cell-type markers, which can be plugged into the CellCODE pipeline. 
+<<echo=TRUE>>=
+markers=plierResToMarkers(plierResult, allPaths, index = c( 1, 8, 9, 11, 16, 21, 33))
+colnames(markers)
+@
+
+We can also visualize the top genes and their pathway associations. Note: only LVs with pathway association are plotted.
+<<echo=TRUE>>=
+indexToPlot=which(apply(plierResult$Uauc,2,max)>0.75)
+plotTopZ(plierResult, vacDataN, allPaths, top = 5, index =  indexToPlot)
+@
+
+Let's plot some of the less reliable LVs
+<<echo=TRUE>>=
+plotTopZ(plierResult, vacDataN, allPaths, top = 15, index =  c(3,29))
+@
+We can see that in this case not all genes have the pathway(s) annotation like this.
+
+
+Since each LV may (and often is) be associated with more than one pathway it can be useful to visualize all the different annotations.
+<<echo=TRUE>>=
+plotTopZallPath(plierResult, vacDataN, allPaths, top = 20, index =  c(3,29), regress = T)
 @
 
 

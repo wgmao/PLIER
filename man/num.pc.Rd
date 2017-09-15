@@ -4,10 +4,12 @@
 \alias{num.pc}
 \title{estimates the number of 'significant' principle components for the SVD decomposition -- this is the minimum k for PLIER}
 \usage{
-num.pc(data, B = 20, seed = NULL)
+num.pc(data, method = "elbow", B = 20, seed = NULL)
 }
 \arguments{
-\item{data}{the same data as to be used for PLIER (z-score recommended)}
+\item{data}{the same data as to be used for PLIER (z-score recommended) or alternatively the result of an svd calculation}
+
+\item{method}{Either "eblow" (fast) or "permutation" (slower, but less heuristic)}
 
 \item{B}{number of permutations}
 

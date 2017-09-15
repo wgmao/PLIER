@@ -3,10 +3,50 @@ require(gplots)
 require(pheatmap)
 require(glmnet)
 require(rsvd)
+rsvd=function(...){
+  message("Using rsvd: set seed for consistent results")
+rsvd::rsvd(...)
+  }
+
+#' Creates a binary cell-type marker matrix using prior results. This matrix can be used for other downstream tasks that require cell-type markers, such as CellCODE
+#' @param plierRes A PLIER result
+#' @param priorMat the binary prior information matrix that was used to compute the plierResult. Including this insures that only the genes annotated to the pathway(s) are included
+#' @param num The number of marker genes to produce
+#' @param index The indecies of PLIER latent variables that are believed to represent cell-type proportions (as opposed to other sources of correlation)
+#' @export
+plierResToMarkers=function(plierRes, priorMat, num=20, index=NULL){
+  
+  ii=which(colSums(plierRes$U)>0)
+  if(! is.null(index)){
+    ii=intersect(ii,index)
+  }
+  Zuse=plierRes$Z[,ii, drop=F]
+
+  for(i in 1:length(ii)){
+    lv=ii[i]
+paths=names(which(plierRes$U[,lv]<0.01))
+genes=names(which(rowSums(priorMat[,paths])>0))
+genesNotInPath=setdiff(rownames(Zuse), genes)
+Zuse[genesNotInPath,i]=0
+}
 
 
+    
+    tag=apply(-Zuse,2,rank)
+    colnames(tag)=rownames(plierRes$B)[ii]  
+  iim=apply(tag,1,min)
+  iig=which(iim<=num)
+  tag=tag[iig,]
+  iin=rowSums(tag<=num)
+  iimulit=which(iin>1)
+ 
+  message(paste0("Genes not matched uniquely: ", paste(names(iimulit), collapse=", ")))
 
-
+  tag=(tag<=num)+1-1
+  
+  tag
+  
+}
 
 #' combines binary pathway matricies into one, rownames are matched by name
 #' 
@@ -61,13 +101,21 @@ AUC<-function(labels, values){
 #' 
 #' @param plierRes A PLIER result
 #' @param top The number of pathway to use. Only the top pathway (one with the largest coefficient) is used by default
+#' @param pval.cutoff The cross-validation pvalue cutoff for a pathway to be considered for naming
 #' @export
-nameB=function(plierRes, top=1){
+nameB=function(plierRes, top=1, pval.cutoff=0.01){
   names=vector("character",ncol(plierRes$U))
-  mm=apply(plierRes$U,2,max)
+  Uuse=plierRes$U
+  if(!is.null(plierRes[["Up"]])){
+  Uuse[plierRes$Up>pval.cutoff]=0
+  }
+  else{
+    warning("No p-values in PLIER object: using coefficients only")
+  }
+  mm=apply(Uuse,2,max)
   for(i in 1:ncol(plierRes$U)){
     if(mm[i]>0){
-      names[i]=paste(i,names(sort(plierRes$U[,i],T))[1:top], sep=",")
+      names[i]=paste(i,names(sort(Uuse[,i],T))[1:top], sep=",")
     }
     else{
       names[i]=paste("LV",i)
@@ -145,7 +193,7 @@ crossVal=function(plierRes, data, priorMat){
 #' @param data the data to be processed with genes in rows and samples in columns. Should be z-scored or set scale=T 
 #' @param priorMat the binary prior information matrix with genes in rows and pathways/genesets in columns
 #' @param svdres Pre-computed result of the svd decomposition for data
-#' @param k The number of latent variables to return
+#' @param k The number of latent variables to return, leave as NULL to be set automatically using the num.pc "elbow" method
 #' @param L1 L1 constant, leave as NULL to automatically select a value
 #' @param L2 L2 constant, leave as NULL to automatically select a value
 #' @param L3 L3 constant, leave as NULL to automatically select a value. Sparsity in U should be instead controlled by setting frac
@@ -158,20 +206,21 @@ crossVal=function(plierRes, data, priorMat){
 #' @param computeAUC Whether or not to do pseudo cross-validation
 #' @param penalty.factor A vector equal to the number of columns in priorMat. Sets relative penalties for different pathway/geneset subsets. Lower penalties will make a pathway more likely to be used. Only the relative values matter. Internally rescaled.
 #' @param glm_alpha Set the alpha for elastic-net
+#' @param minGenes The minimum number of genes a pathway must have to be considered
 #' @export
 
-PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=20, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9){
+PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10){
   
-  
-  solveU=function(Z, Us,priorMat,  L3, penalty.factor, glm_alpha){
+  #Ur is the ranked matrix of pathway relevance
+  solveU=function(Z, Ur,priorMat,  L3, penalty.factor, glm_alpha){
     
   
-    ii=which(apply(Us,1,min)<=maxPath)
-    U=copyMat(Us)
+    ii=which(apply(Ur,1,min)<=maxPath)
+    U=copyMat(Ur)
     U[]=0
     for (j in 1:ncol(U)){
-      selection=which(Us[,j]<=maxPath)
-      tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor)
+      selection=which(Ur[,j]<=maxPath)
+      tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
       U[selection,j]=as.numeric(tmp$beta)
     }
     return(U)
@@ -189,16 +238,20 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
     warning(paste("Selecting common genes:", length(cm)))
     priorMat=priorMat[cm,]
     data=data[cm,]
+
   }
-  
+  numGenes=colSums(priorMat)
+  iibad=which(numGenes<minGenes)
+  warning(paste("Removing", length(iibad), "pathways with too few genes"))
+  priorMat[, iibad]=0
+
   C=priorMat
   
   
   nc=ncol(priorMat)
-  ns=nrow(data)
-  ng=ncol(data)
-  U=matrix(0,nrow=nc, ncol=k )
-  Z=matrix(0, nrow=ng, ncol=k)
+  ng=nrow(data)
+  ns=ncol(data)
+
   Bdiff=-1
   BdiffTrace=double()
   BdiffCount=0
@@ -208,12 +261,21 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
   }
   YsqSum=sum(Y^2)
   #compute svd and use that as the starting point
+
   
   if(is.null(svdres)){
     message("Computing SVD")
-    svdres=rsvd(Y)
-    show(svdres$d[k])
+    if(ns>500){
+    svdres=rsvd(Y, k=min(ns, max(200, ns/4)), q=3)
+    }
+    else{
+      svdres=svd(Y)
+    }
     message("Done")
+  }
+  if(is.null(k)){
+    k=num.pc(svdres)
+    message("k is set to ", k)
   }
   if(nrow(svdres$u)!=nrow(data)){
     message("SVD U has the wrong number of rows")
@@ -223,14 +285,20 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
       Z=svdres$u[rownames(Y),1:k]
     }
     else{
-      message("Computing SVD")
-      svdres=rsvd(Y, k = k)
+      message("No rownames for svdres$u: Recomputing SVD")
+      if(ns>500){
+        svdres=rsvd(Y, k, q=3)
+      }
+      else{
+        svdres=svd(Y)
+      }
+      
       message("Done")
     }
   }else{
     Z=svdres$u[, 1:k]
   }
-  
+ 
   if(is.null(L2)){
     show(svdres$d[k])
     L2=svdres$d[k]
@@ -244,8 +312,10 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
   
   
   B=t(svdres$v[, 1:k]%*%diag(svdres$d[1:k]))
-  
-  round2=function(x){signif(x,4)}
+  U=matrix(0,nrow=ncol(C), ncol=k)
+
+
+   round2=function(x){signif(x,4)}
   message(paste0("errorY (SVD based:best possible) = ", round2(mean((Y-Z%*%B)^2))))
   Z[Z<0]=0
   iter.full.start=iter.full=20
@@ -272,14 +342,10 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
       Us=Chat%*%colSumNorm(Z)
       Us[Us<0]=0
       Us=apply(-Us,2,rank)
-    if(i==iter.full & !L3.given){
-      message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
-      Us=Chat%*%colSumNorm(Z)
-      Us[Us<0]=0
-      Us=apply(-Us,2,rank)
       ii=which(apply(Us,1,min)<=maxPath)
       
-      
+      if(i==iter.full & !L3.given){
+        message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
       biter=0
       
     
@@ -317,12 +383,17 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
           nposlast=npos
           curfrac=(npos<-sum(apply(U,2,max)>0))/k
           message(paste0(npos, " positive columns at L3=", round(L3use,6)))
-          if(curfrac>frac){
-            #increase penatly
+          if(curfrac>frac){  #increase penatly
+            #check if the limits have been reached
+            if((L3_2-L3_1)<1e-7){
+             L3_2=L3_2*100 
+            }
               L3_1=(L3_1+L3_2)/2
           }
-          else{
-            #decrease
+          else{#decrease
+            if((L3_2-L3_1)<1e-7){
+              L3_1=L3_1/100 
+            }
               L3_2=(L3_1+L3_2)/2
             
           }
@@ -384,7 +455,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
       BdiffCount=BdiffCount-1
     }
     
-    if(Bdiff<5e-6){
+    if(Bdiff<1e-5){
       message(paste0("converged at  iteration ", i))
       break
     }
@@ -398,7 +469,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
   colnames(U)=rownames(B)=paste0("LV", 1:k)
   
   out=list(residual=(Y-Z%*%B), B=B, Z=Z, U=U, C=C, numActPath=length(ii), L1=L1, L2=L2, L3=L3)
-  rownames(out$B)=nameB(out)
+
   if(computeAUC){
     crossval=crossVal(out, Y,C)
     
@@ -409,6 +480,7 @@ PLIER=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0
     tt=apply(out$Uauc,2,max)
     message(paste("There are", sum(tt>0.75), " LVs with AUC>0.75"))
   }
+  rownames(out$B)=nameB(out)
   out
 }
 
@@ -458,11 +530,13 @@ plotU=function(plierRes, auc.cutoff=0.6, pval.cutoff=1e-03, indexCol=NULL, index
 #' 
 #' @param plierRes the result returned by PLIER
 #' @param data the data to be displayed in a heatmap, typically the z-scored input data (or some subset thereof)
-#' @param priorInfo the same gene by geneset binary matrix that was used to run PLIER
+#' @param priorMat the same gene by geneset binary matrix that was used to run PLIER
 #' @param top the top number of genes to use
 #' @param index the subset of LVs to display
+#' @param regress remove the effect of all other LVs before plotting top genes, will take longer but can be useful to see distinct patterns in highly correlated genes.
+#' @params ... Additional arguments to be passed to pheatmap, such as a column annotation data.frame
 #' @export
-plotTopZ=function(plierRes, data, priorInfo, top=10, index=NULL){
+plotTopZ=function(plierRes, data, priorMat, top=10, index=NULL, regress=F, ...){
   
   ii=which(colSums(plierRes$U)>0)
   if(! is.null(index)){
@@ -472,10 +546,13 @@ plotTopZ=function(plierRes, data, priorInfo, top=10, index=NULL){
   nn=character()
   nncol=character()
   nnpath=character()
+  nnindex=double()
   for (i in 1:length(ii)){
     nn=c(nn,nntmp<-names(which(tmp[,i]<=top)))
-    nncol=c(nncol, rep(rownames(plierRes$U)[which(thispath<-plierRes$U[,ii[i]]==max(plierRes$U[,ii[i]]))], length(nntmp)))
-    nnpath=c(nnpath,rowSums(priorInfo[nntmp,plierRes$U[,ii[i]]>0, drop=F])>0)
+    nncol=c(nncol, rep(rownames(plierRes$B)[ii[i]], length(nntmp)))
+    nnpath=c(nnpath,rowSums(priorMat[nntmp,plierRes$U[,ii[i]]>0, drop=F])>0)
+    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
+    
   }
   names(nncol)=nn
   nncol=strtrim(nncol, 30)
@@ -486,6 +563,8 @@ plotTopZ=function(plierRes, data, priorInfo, top=10, index=NULL){
     nn=nn[-nnrep.im]
     nncol=nncol[-nnrep.im]
     nnpath=nnpath[-nnrep.im]
+    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
+    
   }
   nnpath[nnpath=="TRUE"]="inPathway"
   nnpath[nnpath=="FALSE"]="notInPathway"
@@ -497,9 +576,17 @@ plotTopZ=function(plierRes, data, priorInfo, top=10, index=NULL){
   
   anncol=list(present=ll)
   toPlot=tscale(data[nn,])
+  
+  if(regress){
+    for ( i in ii){
+      gi=which(nnindex==i)
+      toPlot[gi,]=toPlot[gi, ]-plierRes$Z[rownames(toPlot)[gi],-i ]%*%plierRes$B[-i,colnames(toPlot)]
+    }
+  }
+  
   maxval=max(abs(toPlot))
   
-  pheatmap(toPlot, breaks=seq(-maxval, maxval, length.out = 99),color=colorpanel(100, "green", "white", "red"),annotation_row=nncol, show_colnames = F, annotation_colors = anncol)
+  pheatmap(toPlot, breaks=seq(-maxval, maxval, length.out = 99),color=colorpanel(100, "green", "white", "red"),annotation_row=nncol, show_colnames = F, annotation_colors = anncol, ...)
 }
 
 #' @keywords  internal
@@ -516,7 +603,8 @@ colSumNorm=function(matrix, return.all=F){
 
 
 #' returns the row names in common
-#' 
+#' @param data1 One matrix with gene rownames
+#' @param data2 Another matrix with gene rownames
 #' @export
 commonRows=function(data1, data2){
   intersect(rownames(data1), rownames(data2))
@@ -533,25 +621,58 @@ rowNorm=function(x){
 }
 #' estimates the number of 'significant' principle components for the SVD decomposition -- this is the minimum k for PLIER
 
-#' @param  data the same data as to be used for PLIER (z-score recommended)
+#' @param  data the same data as to be used for PLIER (z-score recommended) or alternatively the result of an svd calculation 
+#' @param method Either "eblow" (fast) or "permutation" (slower, but less heuristic)
 #' @param B number of permutations
 #' @param seed seed for reproducibility 
 #' @export
-num.pc = function (data, B = 20, seed = NULL) 
+num.pc = function (data, method="elbow", B = 20, seed = NULL) 
 {
+  method=match.arg(method, c("elbow", "permutation"))
   if (!is.null(seed)) {
     set.seed(seed)
   }
   warn <- NULL
+  if(class(data)!="list"){
   n <- ncol(data)
   m <- nrow(data)
-  uu <- svd(data)
+  if(n<500){
+    k=n
+  }
+  else{
+    k=max(200,n/4)
+  }
+  if(k==n){
+    uu <- svd(data)
+  }
+  else{
+  uu <- rsvd(data,k, q=3)
+  }
+  }
+  else if (!is.null(data[["d"]])){
+    if(method=="permutation"){
+      message("Original data is needed for permutation method.\nSetting method to elbow")
+    method="elbow"
+    }
+  
+    uu=data
+    
+  }
+    
+  
+ 
+  if(method=="permutation"){
   nn = min(c(n, m))
   dstat <- uu$d[1:nn]^2/sum(uu$d[1:nn]^2)
   dstat0 <- matrix(0, nrow = B, ncol = nn)
   for (i in 1:B) {
     dat0 <- t(apply(data, 1, sample, replace = FALSE))
-    uu0 <- svd(dat0)
+    if(k==n){
+      uu <- svd(data0)
+    }
+    else{
+      uu <- rsvd(data0,k, q=3)
+    }
     dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
   }
   psv <- rep(1, nn)
@@ -561,9 +682,14 @@ num.pc = function (data, B = 20, seed = NULL)
   for (i in 2:nn) {
     psv[i] <- max(psv[(i - 1)], psv[i])
   }
-  show(psv)
+
   nsv <- sum(psv <= 0.1)
-  return(as.numeric(list(n.sv = nsv)))
+  }
+  else if (method=="elbow"){
+    x<-smooth(abs(diff(diff(uu$d))))
+    nsv=which(x<median(x))[1]
+  }
+  return(nsv)
 }
 
 #' @keywords internal
@@ -631,4 +757,83 @@ plotMat=function(matrix,  scale=T, trim.names=50, cutoff=NULL,col.scale=NULL,...
 #' @keywords internal
 tscale=function(mat){
   t(scale(t(mat)))
+}
+#' visualize the top genes contributing to the LVs similarily to \code{\link{plotTopZ}}. However in this case all the pathways contributing to each LV are show seperatly. Useful for seeing pathway usage for a single LV or understading the differences between two closely related LVs
+#' 
+#' @param plierRes the result returned by PLIER
+#' @param data the data to be displayed in a heatmap, typically the z-scored input data (or some subset thereof)
+#' @param priorMat the same gene by geneset binary matrix that was used to run PLIER
+#' @param top the top number of genes to use
+#' @param index the subset of LVs to display
+#' @param regress remove the effect of all other LVs before plotting top genes, will take longer but can be useful to see distinct patterns in highly correlated genes.
+#' @param pval.cutoff P-value cutoff for a pathway to be plotted
+#' @params ... Additional arguments to be passed to pheatmap, such as a column annotation data.frame
+#' @export
+plotTopZallPath=function(plierRes, data, priorMat, top=10, index=NULL, regress=F,pval.cutoff=0.01,...){
+  
+  ii=which(colSums(plierRes$U)>0)
+  if(! is.null(index)){
+    ii=intersect(ii,index)
+  }
+  tmp=apply(-plierRes$Z[, ii, drop=F],2,rank)
+  nn=character()
+  nncol=character()
+  nnpath=character()
+  nnindex=double()
+  Ustrict=plierRes$U
+  Ustrict[plierRes$Up>pval.cutoff]=0
+  
+  pathsUsed=which(rowSums(Ustrict[, index, drop=F])>0)
+  pathMat=matrix(nrow=0, ncol=length(pathsUsed))
+ 
+  colnames(pathMat)=strtrim(names(pathsUsed),30)
+
+  for (i in 1:length(ii)){
+    nn=c(nn,nntmp<-names(which(tmp[,i]<=top)))
+    nncol=c(nncol, rep(rownames(plierRes$U)[which(thispath<-plierRes$U[,ii[i]]==max(plierRes$U[,ii[i]]))], length(nntmp)))
+    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
+    
+    pathMat=rbind(pathMat, priorMat[nntmp, pathsUsed])
+  }
+  pathMat=pathMat[, colSums(pathMat)>0]
+  pathMat=as.data.frame(pathMat)
+  pathMat=apply(pathMat,2,as.factor)
+  names(nncol)=nn
+  nncol=strtrim(nncol, 30)
+  
+  nnrep=names(which(table(nn)>1))
+  
+
+  ll=list(inPathway="black", notInPathway="beige")
+ 
+  ll2=list()
+  for(i in 1:length(pathsUsed)){
+    ll2[[i]]=c("black", "beige")
+    names(ll2[[i]])=c("1","0")
+  }
+  
+  names(ll2)=colnames(pathMat)
+  
+
+  anncol=ll2
+
+  mydist=function(x){as.dist(1-t(cor(t(x))))}
+  rr=max(range(tscale(data[nn,])))
+  bb=seq(-rr,rr, length.out = 100)
+
+  toPlot=data[nn,]
+  if(regress){
+    for ( i in ii){
+      gi=which(nnindex==i)
+  
+      toPlot[gi,]=toPlot[gi, ]-plierRes$Z[rownames(toPlot)[gi],-i ]%*%plierRes$B[-i,colnames(toPlot)]
+    }
+  }
+
+
+#  show(pathMat)
+#  pheatmap(tscale(toPlot), breaks=bb,color=colorpanel(101, "green", "white", "red"),annotation_row=as.data.frame(pathMat))
+  pheatmap(tscale(toPlot), breaks=bb,color=colorpanel(101, "green", "white", "red"),annotation_row=as.data.frame(pathMat[, ]), annotation_legend = F, 
+           show_colnames = F, annotation_colors = anncol,
+           clustering_callback = function(h,d){hclust(mydist(d), method = "average")},...)
 }

@@ -4,18 +4,20 @@
 \alias{plotTopZ}
 \title{visualize the top genes contributing to the LVs}
 \usage{
-plotTopZ(plierRes, data, priorInfo, top = 10, index = NULL)
+plotTopZ(plierRes, data, priorMat, top = 10, index = NULL, regress = F)
 }
 \arguments{
 \item{plierRes}{the result returned by PLIER}
 
 \item{data}{the data to be displayed in a heatmap, typically the z-scored input data (or some subset thereof)}
 
-\item{priorInfo}{the same gene by geneset binary matrix that was used to run PLIER}
+\item{priorMat}{the same gene by geneset binary matrix that was used to run PLIER}
 
 \item{top}{the top number of genes to use}
 
 \item{index}{the subset of LVs to display}
+
+\item{regress}{remove the effect of all other LVs before plotting top genes, will take longer but can be useful to see distinct patterns in highly correlated genes.}
 }
 \description{
 visualize the top genes contributing to the LVs

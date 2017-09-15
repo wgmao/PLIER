@@ -6,6 +6,11 @@
 \usage{
 commonRows(data1, data2)
 }
+\arguments{
+\item{data1}{One matrix with gene rownames}
+
+\item{data2}{Another matrix with gene rownames}
+}
 \description{
 returns the row names in common
 }

@@ -4,10 +4,10 @@
 \alias{PLIER}
 \title{Main PLIER function}
 \usage{
-PLIER(data, priorMat, svdres = NULL, k, L1 = NULL, L2 = NULL, L3 = NULL,
-  frac = 0.7, max.iter = 350, trace = F, scale = F, Chat = NULL,
-  maxPath = 10, computeAUC = T, penalty.factor = rep(1, ncol(priorMat)),
-  glm_alpha = 0.9)
+PLIER(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
+  L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = F,
+  Chat = NULL, maxPath = 10, computeAUC = T, penalty.factor = rep(1,
+  ncol(priorMat)), glm_alpha = 0.9, minGenes = 10)
 }
 \arguments{
 \item{data}{the data to be processed with genes in rows and samples in columns. Should be z-scored or set scale=T}
@@ -16,7 +16,7 @@ PLIER(data, priorMat, svdres = NULL, k, L1 = NULL, L2 = NULL, L3 = NULL,
 
 \item{svdres}{Pre-computed result of the svd decomposition for data}
 
-\item{k}{The number of latent variables to return}
+\item{k}{The number of latent variables to return, leave as NULL to be set automatically using the num.pc "elbow" method}
 
 \item{L1}{L1 constant, leave as NULL to automatically select a value}
 
@@ -41,6 +41,8 @@ PLIER(data, priorMat, svdres = NULL, k, L1 = NULL, L2 = NULL, L3 = NULL,
 \item{penalty.factor}{A vector equal to the number of columns in priorMat. Sets relative penalties for different pathway/geneset subsets. Lower penalties will make a pathway more likely to be used. Only the relative values matter. Internally rescaled.}
 
 \item{glm_alpha}{Set the alpha for elastic-net}
+
+\item{minGenes}{The minimum number of genes a pathway must have to be considered}
 }
 \description{
 Main PLIER function

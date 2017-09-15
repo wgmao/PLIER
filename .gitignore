@@ -10,3 +10,5 @@
 inst/doc
 vignettes/*
 !vignettes/*Rnw
+!vignettes/*pdf
+!vignettes/*html
