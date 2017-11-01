@@ -207,9 +207,10 @@ crossVal=function(plierRes, data, priorMat){
 #' @param penalty.factor A vector equal to the number of columns in priorMat. Sets relative penalties for different pathway/geneset subsets. Lower penalties will make a pathway more likely to be used. Only the relative values matter. Internally rescaled.
 #' @param glm_alpha Set the alpha for elastic-net
 #' @param minGenes The minimum number of genes a pathway must have to be considered
+#' @param tol Convergence threshold
 #' @export
 
-PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10){
+PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-5){
   
   #Ur is the ranked matrix of pathway relevance
   solveU=function(Z, Ur,priorMat,  L3, penalty.factor, glm_alpha){
@@ -455,7 +456,7 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
       BdiffCount=BdiffCount-1
     }
     
-    if(Bdiff<1e-5){
+    if(Bdiff<tol){
       message(paste0("converged at  iteration ", i))
       break
     }
