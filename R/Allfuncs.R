@@ -296,9 +296,10 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
       
       message("Done")
     }
-  }else{
-    Z=svdres$u[, 1:k]
   }
+
+    Z=svdres$u[, 1:k]
+  
  
   if(is.null(L2)){
     show(svdres$d[k])
