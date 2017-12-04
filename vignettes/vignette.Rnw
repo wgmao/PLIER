@@ -9,6 +9,11 @@ concordance=TRUE
 )
 @
 
+<<setup, include=FALSE, cache=FALSE, tidy=TRUE>>=
+options(tidy=TRUE, width.cutoff=50)
+@
+
+
 <<>>=
 library(PLIER)
 @
@@ -24,27 +29,27 @@ data(vacData)
 @
 Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersIRISDMAP and svmMarkers and select genes appearing in both gene expression profile and the joint pathway matrix.
 <<echo=TRUE>>=
-allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers,canonicalPathways)
+allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers, canonicalPathways)
 cm.genes=commonRows(allPaths, vacData)
 @
-Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 26. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=34 and all other parameters to be default.
+Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 26. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=34 and all other parameters to be default. We set the seed to get reprducible results for held-out pathway genes.
 <<echo=TRUE>>=
 vacDataN=rowNorm(vacData)
 num.pc(vacDataN)
-#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T)
+#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T, seed = 123)
 @
-In the interest of speed we provide a pre-computed version though for this example it will only take a around a minute.
+In the interest of speed we provide a pre-computed version though for this example it will only take less than a minute.
 <<echo=TRUE>>=
 data(plierResult)
 @
 
 Visualize the U matrix with default cutoffs
 <<echo=TRUE>>=
-plotU(plierResult, auc.cutoff = 0.75, pval.cutoff = 0.01, top = 3)
+plotU(plierResult, auc.cutoff = 0.70, fdr.cutoff = 0.05, top = 3)
 @
 Visualize the U matrix with more permissive cutoffs
 <<echo=TRUE>>=
-plotU(plierResult, auc.cutoff = 0.6, pval.cutoff = 0.05, top = 3)
+plotU(plierResult, auc.cutoff = 0.6, fdr.cutoff = 0.2, top = 3)
 @
 
 We can correlate the decomposition result with SPVs from CellCODE like this.
@@ -67,15 +72,15 @@ plotTopZ(plierResult, vacDataN, allPaths, top = 5, index =  indexToPlot)
 @
 
 Let's plot some of the less reliable LVs
-<<echo=TRUE>>=
-plotTopZ(plierResult, vacDataN, allPaths, top = 15, index =  c(3,29))
+<<echo=TRUE, tidy=T>>=
+plotTopZ(plierResult, vacDataN, allPaths, top = 15, index =  c(3,32))
 @
-We can see that in this case not all genes have the pathway(s) annotation like this.
+We can see that in this case not all genes have the pathway(s) annotation.
 
 
-Since each LV may (and often is) be associated with more than one pathway it can be useful to visualize all the different annotations.
-<<echo=TRUE>>=
-plotTopZallPath(plierResult, vacDataN, allPaths, top = 20, index =  c(3,29), regress = T)
+Since each LV may (and often is) be associated with more than one pathway it can be useful to visualize all the different annotations. We can also plot more genes since for some small ro weakly predicted pathways they may be quite far from the top.
+<<echo=TRUE, fig.height=12, tidy=T>>=
+plotTopZallPath(plierResult, vacDataN, allPaths, top = 50, index =  c(32))
 @
 
 
