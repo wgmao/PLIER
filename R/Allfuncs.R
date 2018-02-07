@@ -528,7 +528,7 @@ if(computeAUC){
 #' @param sort.row do not custer the matrix but instead sort it to display the positive values close do the 'diagonal'
 #' @param ... options to be passed to pheatmap
 #' @export
-plotU=function(plierRes, auc.cutoff=0.6, fdr.cutoff, indexCol=NULL, indexRow=NULL, top=3, sort.row=F,...){
+plotU=function(plierRes, auc.cutoff=0.6, fdr.cutoff=0.05, indexCol=NULL, indexRow=NULL, top=3, sort.row=F,...){
   if(is.null(indexCol)){
     indexCol=1:ncol(plierRes$U)
   }

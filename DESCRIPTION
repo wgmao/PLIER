@@ -9,4 +9,4 @@ Description: Prior information
 License: GPL (>=2)
 RoxygenNote: 6.0.1
 VignetteBuilder: knitr
-Depends: RColorBrewer, gplots, pheatmap, glmnet, knitr, rsvd
+Depends: RColorBrewer, gplots, pheatmap, glmnet, knitr, rsvd, qvalue
