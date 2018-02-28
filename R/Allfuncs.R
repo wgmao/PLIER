@@ -708,10 +708,10 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
   for (i in 1:B) {
     dat0 <- t(apply(data, 1, sample, replace = FALSE))
     if(k==n){
-      uu <- svd(data)
+      uu0 <- svd(dat0)
     }
     else{
-      uu <- rsvd(data,k, q=3)
+      uu0 <- rsvd(dat0,k, q=3)
     }
     dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
   }
