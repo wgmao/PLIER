@@ -19,7 +19,8 @@ QV<-function(pval){
     return(x$qvalue)
   }
 }
-
+#' @keywords  internal
+BH= function(pval){p.adjust(pval, method="BH")}
 
 rsvd=function(...){
   message("Using rsvd: set seed for consistent results")
@@ -121,7 +122,7 @@ AUC<-function(labels, values){
 #' @param top The number of pathway to use. Only the top pathway (one with the largest coefficient) is used by default
 #' @param fdr.cutoff The cross-validation significance cutoff for a pathway to be considered for naming
 #' @export
-nameB=function(plierRes, top=1, fdr.cutoff=0.05){
+nameB=function(plierRes, top=1, fdr.cutoff=0.01){
 
   names=vector("character",ncol(plierRes$U))
   Uuse=plierRes$U
@@ -193,7 +194,7 @@ crossVal=function(plierRes, data, priorMat, priorMatcv){
   out=data.frame(out,stringsAsFactors = F)
   out[,3]=as.numeric(out[,3])
   out[,4]=as.numeric(out[,4])
-  out[,5]=QV(out[,4])
+  out[,5]=BH(out[,4])
   colnames(out)=c("pathway", "LV index", "AUC", "p-value", "FDR") 
   return(list(Uauc=Uauc, Upval=Up, summary=out))
 }
@@ -809,73 +810,73 @@ tscale=function(mat){
 #' @param fdr.cutoff Significance cutoff for a pathway to be plotted
 #' @params ... Additional arguments to be passed to pheatmap, such as a column annotation data.frame
 #' @export
-plotTopZallPath=function(plierRes, data, priorMat, top=10, index=NULL, regress=F,fdr.cutoff=0.05,...){
-  
-  
-  pval.cutoff=max(plierRes$summary[plierRes$summary[,5]<fdr.cutoff,4])
-  ii=which(colSums(plierRes$U)>0)
-  if(! is.null(index)){
-    ii=intersect(ii,index)
+#' 
+#' 
+plotTopZallPath=function (plierRes, data, priorMat, top = 10, index = NULL, regress = F, 
+                          fdr.cutoff = 0.01, ...) 
+{
+  pval.cutoff = max(plierRes$summary[plierRes$summary[, 5] < 
+                                       fdr.cutoff, 4])
+  ii = which(colSums(plierRes$U) > 0)
+  if (!is.null(index)) {
+    ii = intersect(ii, index)
   }
-  tmp=apply(-plierRes$Z[, ii, drop=F],2,rank)
-  nn=character()
-  nncol=character()
-  nnpath=character()
-  nnindex=double()
-  Ustrict=plierRes$U
-  Ustrict[plierRes$Up>pval.cutoff]=0
-  
-  pathsUsed=which(rowSums(Ustrict[, index, drop=F])>0)
-  pathMat=matrix(nrow=0, ncol=length(pathsUsed))
- 
-  colnames(pathMat)=strtrim(names(pathsUsed),30)
-
-  for (i in 1:length(ii)){
-    nn=c(nn,nntmp<-names(which(tmp[,i]<=top)))
-    nncol=c(nncol, rep(rownames(plierRes$U)[which(thispath<-plierRes$U[,ii[i]]==max(plierRes$U[,ii[i]]))], length(nntmp)))
-    nnindex=c(nnindex,rep(ii[i], length(nntmp)))
-    
-    pathMat=rbind(pathMat, priorMat[nntmp, pathsUsed])
-  }
-  pathMat=pathMat[, colSums(pathMat)>0]
-  pathMat=as.data.frame(pathMat)
-  pathMat=apply(pathMat,2,as.factor)
-  names(nncol)=nn
-  nncol=strtrim(nncol, 30)
-  
-  nnrep=names(which(table(nn)>1))
-  
-
-  ll=list(inPathway="black", notInPathway="beige")
- 
-  ll2=list()
-  for(i in 1:length(pathsUsed)){
-    ll2[[i]]=c("black", "beige")
-    names(ll2[[i]])=c("1","0")
+  tmp = apply(-plierRes$Z[, ii, drop = F], 2, rank)
+  nn = character()
+  nncol = character()
+  nnpath = character()
+  nnindex = double()
+  Ustrict = plierRes$U
+  Ustrict[plierRes$Up > pval.cutoff] = 0
+  pathsUsed = which(rowSums(Ustrict[, index, drop = F]) > 0)
+  pathMat = matrix(nrow = 0, ncol = length(pathsUsed))
+  colnames(pathMat) = strtrim(names(pathsUsed), 30)
+  for (i in 1:length(ii)) {
+    nn = c(nn, nntmp <- names(which(tmp[, i] <= top)))
+    nncol = c(nncol, rep(rownames(plierRes$U)[which(thispath <- plierRes$U[, 
+                                                                           ii[i]] == max(plierRes$U[, ii[i]]))], length(nntmp)))
+    nnindex = c(nnindex, rep(ii[i], length(nntmp)))
+    pathMat = rbind(pathMat, priorMat[nntmp, pathsUsed, drop=F])
   }
   
-  names(ll2)=colnames(pathMat)
+  if(sum(colSums(pathMat)>1)>0){
+    pathMat = pathMat[, colSums(pathMat) > 0]
+  }
+  pathMat = as.data.frame(pathMat)
+  colnames(pathMat)= strtrim(names(pathsUsed), 30)
   
-
-  anncol=ll2
-
-  mydist=function(x){as.dist(1-t(cor(t(x))))}
-  rr=max(range(tscale(data[nn,])))
-  bb=seq(-rr,rr, length.out = 100)
-
-  toPlot=data[nn,]
-  if(regress){
-    for ( i in ii){
-      gi=which(nnindex==i)
+  pathMat = apply(pathMat, 2, as.factor)
   
-      toPlot[gi,]=toPlot[gi, ]-plierRes$Z[rownames(toPlot)[gi],-i ]%*%plierRes$B[-i,colnames(toPlot)]
+  names(nncol) = nn
+  nncol = strtrim(nncol, 30)
+  nnrep = names(which(table(nn) > 1))
+  ll = list(inPathway = "black", notInPathway = "beige")
+  ll2 = list()
+  for (i in 1:length(pathsUsed)) {
+    ll2[[i]] = c("black", "beige")
+    names(ll2[[i]]) = c("1", "0")
+  }
+  names(ll2) = colnames(pathMat)
+  
+  anncol = ll2
+  mydist = function(x) {
+    as.dist(1 - t(cor(t(x))))
+  }
+  rr = max(range(tscale(data[nn, ])))
+  bb = seq(-rr, rr, length.out = 100)
+  toPlot = data[nn, ]
+  if (regress) {
+    for (i in ii) {
+      gi = which(nnindex == i)
+      toPlot[gi, ] = toPlot[gi, ] - plierRes$Z[rownames(toPlot)[gi], 
+                                               -i] %*% plierRes$B[-i, colnames(toPlot)]
     }
   }
-
-
-#  show(pathMat)
-#  pheatmap(tscale(toPlot), breaks=bb,color=colorpanel(101, "green", "white", "red"),annotation_row=as.data.frame(pathMat))
-  pheatmap(tscale(toPlot), breaks=bb,color=colorpanel(101, "green", "white", "red"),annotation_row=as.data.frame(pathMat[, ]), annotation_legend = F, 
-           show_colnames = F, annotation_colors = anncol,
-           clustering_callback = function(h,d){hclust(mydist(d), method = "average")},...)
+  pheatmap(tscale(toPlot), breaks = bb, color = colorpanel(101, 
+                                                           "green", "white", "red"), annotation_row = as.data.frame(pathMat
+                                                           ), annotation_legend = F, show_colnames = F, annotation_colors = anncol, 
+           clustering_callback = function(h, d) {
+             hclust(mydist(d), method = "average")
+           }, ...)
 }
+
