@@ -4,16 +4,14 @@ Pathway-Level Information Extractor (PLIER): a generative model for gene express
 Library dependencies
 
 ```
-glmnet
-```
-
-Additional library dependencies for the vignettes
-
-```
 RColorBrewer
 gplots
 pheatmap
+glmnet
+rsvd
+qvalue
 ```
+
 
 To install the R package
 ```
