@@ -22,10 +22,7 @@ QV<-function(pval){
 #' @keywords  internal
 BH= function(pval){p.adjust(pval, method="BH")}
 
-rsvd=function(...){
-  message("Using rsvd: set seed for consistent results")
-rsvd::rsvd(...)
-  }
+
 
 #' Creates a binary cell-type marker matrix using prior results. This matrix can be used for other downstream tasks that require cell-type markers, such as CellCODE
 #' @param plierRes A PLIER result
@@ -224,22 +221,28 @@ crossVal=function(plierRes, data, priorMat, priorMatcv){
 #' @param seed Set the seed for reproducible results
 #' @export
 
-PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-5, seed=NULL){
+PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-5, seed=1234){
   
   #Ur is the ranked matrix of pathway relevance
   solveU=function(Z, Ur,priorMat,  L3, penalty.factor, glm_alpha){
-    
-  
+
     ii=which(apply(Ur,1,min)<=maxPath)
+   
     U=copyMat(Ur)
     U[]=0
+    
     for (j in 1:ncol(U)){
-      selection=which(Ur[,j]<=maxPath)
-      tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
+     # selection=which(Ur[,j]<=maxPath)
+     selection=ii
+       tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
       U[selection,j]=as.numeric(tmp$beta)
     }
+
     return(U)
   }
+  
+
+  
   
   if(scale){
     Y=rowNorm(data)
@@ -248,19 +251,20 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
     Y=data
   }
   
-  if(!all(rownames(priorMat)==rownames(data))){
+  if(nrow(priorMat)!=nrow(data) || !all(rownames(priorMat)==rownames(data))){
     cm=commonRows(data, priorMat)
-    warning(paste("Selecting common genes:", length(cm)))
+    message(paste("Selecting common genes:", length(cm)))
     priorMat=priorMat[cm,]
-    data=data[cm,]
+    Y=Y[cm,]
 
   }
   numGenes=colSums(priorMat)
-  iibad=which(numGenes<minGenes)
-  warning(paste("Removing", length(iibad), "pathways with too few genes"))
-  priorMat[, iibad]=0
+ 
   heldOutGenes=list()
 if(computeAUC){
+  iibad=which(numGenes<minGenes)
+  message(paste("Removing", length(iibad), "pathways with too few genes"))
+  priorMat[, iibad]=0
   priorMatCV=priorMat
   if(!is.null(seed))
     set.seed(seed)
@@ -286,6 +290,8 @@ if(computeAUC){
   if(is.null(Chat)){
     Cp=crossprod(C)
     Chat=pinv.ridge(Cp, 5)%*%(t(C))
+  
+  
   }
   YsqSum=sum(Y^2)
   #compute svd and use that as the starting point
@@ -294,7 +300,7 @@ if(computeAUC){
   if(is.null(svdres)){
     message("Computing SVD")
     if(ns>500){
-    svdres=rsvd(Y, k=min(ns, max(200, ns/4)), q=3)
+    set.seed(1234);svdres=rsvd(Y, k=min(ns, max(200, ns/4)), q=3)
     }
     else{
       svdres=svd(Y)
@@ -302,10 +308,10 @@ if(computeAUC){
     message("Done")
   }
   if(is.null(k)){
-    k=num.pc(svdres)
+    k=num.pc(svdres)*2
     message("k is set to ", k)
   }
-  if(nrow(svdres$u)!=nrow(data)){
+  if(nrow(svdres$u)!=nrow(Y)){
     message("SVD U has the wrong number of rows")
     
     if(!is.null(rownames(svdres$u))){
@@ -317,7 +323,7 @@ if(computeAUC){
       if(ns>500){
         if(!is.null(seed))
           set.seed(seed)
-        svdres=rsvd(Y, k, q=3)
+        set.seed(1234);svdres=rsvd(Y, k, q=3)
       }
       else{
         svdres=svd(Y)
@@ -371,11 +377,15 @@ if(computeAUC){
       
       #Compute Us
       Us=Chat%*%colSumNorm(Z)
+   
       Us[Us<0]=0
       Us=apply(-Us,2,rank)
-      ii=which(apply(Us,1,min)<=maxPath)
       
+      ii=which(apply(Us,1,min)<=maxPath)
+    
       if(i==iter.full & !L3.given){
+   
+     
         message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
       biter=0
       
@@ -409,11 +419,11 @@ if(computeAUC){
     
         while (biter < 150&(biter<1|abs(frac-curfrac)>1/k|npos==0)){
           
-          U=solveU(Z, Us, priorMat,  L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
-          
+         U=solveU(Z, Us, priorMat,  L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
+
           nposlast=npos
           curfrac=(npos<-sum(apply(U,2,max)>0))/k
-         # message(paste0(npos, " positive columns at L3=", round(L3use,6)))
+          message(paste0(npos, " positive columns at L3=", round(L3use,6)))
           if(curfrac>frac){  #increase penatly
             #check if the limits have been reached
             if((L3_2-L3_1)<1e-7){
@@ -669,14 +679,17 @@ rowNorm=function(x){
 #' @export
 num.pc = function (data, method="elbow", B = 20, seed = NULL) 
 {
+
   method=match.arg(method, c("elbow", "permutation"))
   if (!is.null(seed)) {
     set.seed(seed)
   }
   warn <- NULL
   if(class(data)!="list"){
+    message("Computing svd")
   n <- ncol(data)
   m <- nrow(data)
+  data=rowNorm(data)
   if(n<500){
     k=n
   }
@@ -687,7 +700,7 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
     uu <- svd(data)
   }
   else{
-  uu <- rsvd(data,k, q=3)
+  set.seed(1234);uu <- rsvd(data,k, q=3)
   }
   }
   else if (!is.null(data[["d"]])){
@@ -712,7 +725,7 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
       uu0 <- svd(dat0)
     }
     else{
-      uu0 <- rsvd(dat0,k, q=3)
+      set.seed(1234);uu0 <- rsvd(dat0,k, q=3)
     }
     dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
   }
@@ -727,8 +740,12 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
   nsv <- sum(psv <= 0.1)
   }
   else if (method=="elbow"){
-    x<-smooth(abs(diff(diff(uu$d))))
-    nsv=which(x<median(x))[1]
+    x=smooth(xraw<-abs(diff(diff(uu$d))), twiceit = T)
+ plot(x)
+ 
+
+ nsv=which(x<quantile(x, 0.5))[1]+1
+    
   }
   return(nsv)
 }
@@ -880,3 +897,225 @@ plotTopZallPath=function (plierRes, data, priorMat, top = 10, index = NULL, regr
            }, ...)
 }
 
+PLIERold=function(data, priorMat,svdres=NULL, k, L1=NULL, L2=NULL, L3=NULL,  frac=0.7, posU=T, posZ=T, max.iter=200, trace=F, scale=F, Chat=NULL, maxPath=10, computeAUC=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9){
+  
+  
+  solveU=function(Z, Chat,priorMat, selection, L3, penalty.factor, glm_alpha){
+    
+    Us=Chat%*%colSumNorm(Z)
+  
+    Us[Us<0]=0
+    Us=apply(-Us,2,rank)
+
+    
+    ii=which(apply(Us,1,min)<=maxPath)
+
+
+    U=copyMat(Us)
+    U[]=0
+    for (j in 1:ncol(U)){
+      tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor)
+      U[selection,j]=as.numeric(tmp$beta)
+    }
+    return(U)
+  }
+  
+  if(scale){
+    Y=rowNorm(data)
+  }
+  else{
+    Y=data
+  }
+  
+  C=priorMat
+  
+  
+  nc=ncol(priorMat)
+  ns=nrow(data)
+  ng=ncol(data)
+  U=matrix(0,nrow=nc, ncol=k )
+  Z=matrix(0, nrow=ng, ncol=k)
+  Bdiff=-1
+  BdiffTrace=double()
+  BdiffCount=0
+  if(is.null(Chat)){
+    Cp=crossprod(C)
+    Chat=pinv.ridge(Cp, 5)%*%(t(C))
+ 
+  }
+  YsqSum=sum(Y^2)
+  #compute svd and use that as the starting point
+  
+  if(is.null(svdres)){
+    message("Computing SVD")
+    svdres=svd(Y)
+    message("Done")
+  }
+  if(nrow(svdres$u)!=nrow(data)){
+    message("SVD U has the wrong number of rows")
+    
+    if(!is.null(rownames(svdres$u))){
+      message("Selecting via rownames")
+      Z=svdres$u[rownames(Y),1:k]
+    }
+    else{
+      message("Computing SVD")
+      svdres=rsvd(Y, k = k)
+      message("Done")
+    }
+  }else{
+    Z=svdres$u[, 1:k]
+  }
+  
+  if(is.null(L2)){
+    L2=svdres$d[k]
+    print(paste0("L2 is set to ",L2))
+  }
+  if(is.null(L1)){
+    L1=L2/2
+    print(paste0("L1 is set to ",L1))
+  }
+  
+  
+  
+  B=t(svdres$v[, 1:k]%*%diag(svdres$d[1:k]))
+  
+  round2=function(x){signif(x,4)}
+  message(paste0("errorY (SVD based:best possible) = ", round2(mean((Y-Z%*%B)^2))))
+  Z[Z<0]=0
+  iter.full.start=iter.full=20
+  
+  curfrac=0
+  nposlast=Inf
+  npos=-Inf
+  
+  for ( i in 1:max.iter){
+    
+    
+    
+    
+    #  if(i==1 & is.null(L3)){
+    
+    #    L3=quantile(apply(Us,2,max), 1-frac)
+    #    print(paste0("L3 is set to ",L3))
+    # }
+    
+    if(i==iter.full){
+   
+      
+      message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
+      Us=Chat%*%colSumNorm(Z)
+      Us[Us<0]=0
+      Us=apply(-Us,2,rank)
+      ii=which(apply(Us,1,min)<=maxPath)
+ 
+      
+      biter=0
+      
+      L3_1=0.000001
+      L3_2=1
+      if(abs(frac-curfrac)>1/k){
+        while (biter < 150&(biter<1|abs(frac-curfrac)>1/k|npos==0)){
+          
+          U=solveU(Z, Chat, priorMat, ii, L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
+          nposlast=npos
+          curfrac=(npos<-sum(apply(U,2,max)>0))/k
+          message(paste0(npos, " positive columns at L3=", round(L3use,6)))
+          if(curfrac>frac){
+            #increase penatly
+            L3_1=(L3_1+L3_2)/2
+          }
+          else{
+            #decrease
+            L3_2=(L3_1+L3_2)/2 
+          }
+          biter=biter+1
+          #show(c(npos, nposlast, frac, curfrac, abs(frac-curfrac), 1/k))
+        }
+        L3=L3use
+        message(paste0("L3 is set to ", round(L3, 6), " in ", biter, " iterations"))
+      }
+      else{
+        message("L3 not changed")
+      }
+      
+      iter.full=iter.full+iter.full.start
+    }
+    if(i>=iter.full.start){
+    
+      #find the active pathways  
+      Us=Chat%*%colSumNorm(Z)
+      Us[Us<0]=0
+      Us=apply(-Us,2,rank)
+      ii=which(apply(Us,1,min)<=maxPath)
+      
+      
+      U=solveU(Z, Chat, priorMat, ii, L3, penalty.factor, glm_alpha)
+      curfrac=(npos<-sum(apply(U,2,max)>0))/k
+      Z1=Y%*%t(B)
+      Z2=L1*C%*%U
+      ratio=median((Z2/Z1)[Z2>0&Z1>0])
+      Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1*diag(k))
+    }
+    else{
+      Z=(Y%*%t(B))%*%solve(tcrossprod(B)+L1*diag(k))
+    }
+    
+    if(posZ){
+      Z[Z<0]=0
+    } 
+    
+    oldB=B
+    B=solve(t(Z)%*%Z+L2*diag(k))%*%t(Z)%*%Y
+    
+    
+    
+    
+    Bdiff=sum((B-oldB)^2)/sum(B^2)
+    BdiffTrace=c(BdiffTrace, Bdiff)
+    
+    
+    err0=sum((Y-Z%*%B)^2)+sum((Z-C%*%U)^2)*L1+sum(B^2)*L2
+    if(trace & i >=iter.full.start){
+      
+      message(paste0("iter",i, " errorY= ",erry<-round2(mean((Y-Z%*%B)^2)), ", prior information ratio= ", round(ratio,2), ", Bdiff= ",round2(Bdiff), ", Bkappa=", round2(kappa(B))), ";pos. col. U=", sum(colSums(U)>0))
+    }
+    else if (trace){
+      message(paste0("iter",i, " errorY= ",erry<-round2(mean((Y-Z%*%B)^2)), ", Bdiff= ",round2(Bdiff), ", Bkappa=", round2(kappa(B))))
+    }
+    
+    if(i>52&&Bdiff>BdiffTrace[i-50]){
+      BdiffCount=BdiffCount+1
+      message("Bdiff is not decreasing")
+    }
+    else if(BdiffCount>1){
+      BdiffCount=BdiffCount-1
+    }
+    
+    if(Bdiff<5e-6){
+      message(paste0("converged at  iteration ", i))
+      break
+    }
+    if( BdiffCount>5){
+      message(paste0("converged at  iteration ", i, " Bdiff is not decreasing"))
+      break
+    }
+    
+  }
+  rownames(U)=colnames(priorMat)
+  colnames(U)=rownames(B)=paste0("LV", 1:k)
+  
+  out=list(residual=(Y-Z%*%B), B=B, Z=Z, U=U, C=C, numActPath=length(ii), L1=L1, L2=L2, L3=L3)
+  rownames(out$B)=nameB(out)
+  if(computeAUC){
+    crossval=crossVal(out, Y,C)
+    
+    out$withPrior=which(colSums(out$U)>0)
+    out$Uauc=crossval$Uauc
+    out$Up=crossval$Upval
+    out$summary=crossval$summary
+    tt=apply(out$Uauc,2,max)
+    message(paste("There are", sum(tt>0.75), " LVs with AUC>0.75"))
+  }
+  out
+}
