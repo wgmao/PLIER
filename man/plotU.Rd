@@ -4,7 +4,7 @@
 \alias{plotU}
 \title{plot the U matrix from a PLIER decomposition}
 \usage{
-plotU(plierRes, auc.cutoff = 0.6, pval.cutoff = 0.001, indexCol = NULL,
+plotU(plierRes, auc.cutoff = 0.6, fdr.cutoff = 0.05, indexCol = NULL,
   indexRow = NULL, top = 3, sort.row = F, ...)
 }
 \arguments{
@@ -12,7 +12,7 @@ plotU(plierRes, auc.cutoff = 0.6, pval.cutoff = 0.001, indexCol = NULL,
 
 \item{auc.cutoff}{the AUC cutoff for pathways to be displayed, increase to get a smaller subset of U}
 
-\item{pval.cutoff}{the significance cutoff for the pathway-LV association}
+\item{fdr.cutoff}{the significance cutoff for the pathway-LV association}
 
 \item{indexCol}{restrict to a subset of the columns (LVs)}
 

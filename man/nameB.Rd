@@ -4,14 +4,14 @@
 \alias{nameB}
 \title{names latent variables according to their pathway useage (if any)}
 \usage{
-nameB(plierRes, top = 1, pval.cutoff = 0.01)
+nameB(plierRes, top = 1, fdr.cutoff = 0.01, use = c("coef", "AUC"))
 }
 \arguments{
 \item{plierRes}{A PLIER result}
 
 \item{top}{The number of pathway to use. Only the top pathway (one with the largest coefficient) is used by default}
 
-\item{pval.cutoff}{The cross-validation pvalue cutoff for a pathway to be considered for naming}
+\item{fdr.cutoff}{The cross-validation significance cutoff for a pathway to be considered for naming. If no pathways satisfy the cutoff the raw coefficients are used.}
 }
 \description{
 names latent variables according to their pathway useage (if any)

@@ -5,7 +5,7 @@
 \title{visualize the top genes contributing to the LVs similarily to \code{\link{plotTopZ}}. However in this case all the pathways contributing to each LV are show seperatly. Useful for seeing pathway usage for a single LV or understading the differences between two closely related LVs}
 \usage{
 plotTopZallPath(plierRes, data, priorMat, top = 10, index = NULL,
-  regress = F, ...)
+  regress = F, fdr.cutoff = 0.2, ...)
 }
 \arguments{
 \item{plierRes}{the result returned by PLIER}
@@ -19,6 +19,8 @@ plotTopZallPath(plierRes, data, priorMat, top = 10, index = NULL,
 \item{index}{the subset of LVs to display}
 
 \item{regress}{remove the effect of all other LVs before plotting top genes, will take longer but can be useful to see distinct patterns in highly correlated genes.}
+
+\item{fdr.cutoff}{Significance cutoff for a pathway to be plotted}
 }
 \description{
 visualize the top genes contributing to the LVs similarily to \code{\link{plotTopZ}}. However in this case all the pathways contributing to each LV are show seperatly. Useful for seeing pathway usage for a single LV or understading the differences between two closely related LVs

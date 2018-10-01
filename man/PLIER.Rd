@@ -5,9 +5,10 @@
 \title{Main PLIER function}
 \usage{
 PLIER(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
-  L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = F,
-  Chat = NULL, maxPath = 10, computeAUC = T, penalty.factor = rep(1,
-  ncol(priorMat)), glm_alpha = 0.9, minGenes = 10)
+  L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T,
+  Chat = NULL, maxPath = 10, doCrossval = T, penalty.factor = rep(1,
+  ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06,
+  seed = 12345, allGenes = F, rseed = NULL)
 }
 \arguments{
 \item{data}{the data to be processed with genes in rows and samples in columns. Should be z-scored or set scale=T}
@@ -36,13 +37,21 @@ PLIER(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
 
 \item{maxPath}{The maximum number of active pathways per latent variable}
 
-\item{computeAUC}{Whether or not to do pseudo cross-validation}
+\item{doCrossval}{Whether or not to do real cross-validation with held-out pathway genes. Alternatively, all gene annotations are used and only pseudo-crossvalidation is done. The latter option may be preferable if some pathways of interest have few genes.}
 
 \item{penalty.factor}{A vector equal to the number of columns in priorMat. Sets relative penalties for different pathway/geneset subsets. Lower penalties will make a pathway more likely to be used. Only the relative values matter. Internally rescaled.}
 
 \item{glm_alpha}{Set the alpha for elastic-net}
 
 \item{minGenes}{The minimum number of genes a pathway must have to be considered}
+
+\item{tol}{Convergence threshold}
+
+\item{seed}{Set the seed for pathway cross-validation}
+
+\item{allGenes}{Use all genes. By default only genes in the priorMat matrix are used.}
+
+\item{rseed}{Set this option to use a random initialization, instead of SVD}
 }
 \description{
 Main PLIER function

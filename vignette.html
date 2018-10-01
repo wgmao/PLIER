@@ -1,0 +1,174 @@
+\documentclass{article}
+
+\begin{document}
+
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> library(knitr)</xmp></p>
+
+
+
+<p><xmp class=command>> opts_chunk$set(concordance = TRUE)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> library(PLIER)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+\section{Some Notes}
+PLIER runs reasonably fast but to get the best performance we recommend that you use linear algebra libraries optimized for your system. For Ubuntu and Windows you can follow instructions at http://brettklamer.com/diversions/statistical/faster-blas-in-r/.
+\section{Vaccination Dataset}
+Load data
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> data(bloodCellMarkersIRISDMAP)</xmp></p>
+
+
+
+<p><xmp class=command>> data(svmMarkers)</xmp></p>
+
+
+
+<p><xmp class=command>> data(canonicalPathways)</xmp></p>
+
+
+
+<p><xmp class=command>> data(vacData)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersIRISDMAP and svmMarkers and select genes appearing in both gene expression profile and the joint pathway matrix.
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> allPaths = combinePaths(bloodCellMarkersIRISDMAP, svmMarkers, </xmp></p>
+
+<p><xmp class=command>>     canonicalPathways)</xmp></p>
+
+
+
+<p><xmp class=command>> cm.genes = commonRows(allPaths, vacData)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 26. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=32 and all other parameters to be default.
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> vacDataN = rowNorm(vacData)</xmp></p>
+
+
+
+<p><xmp class=command>> num.pc(vacDataN[cm.genes, ])</xmp></p>
+
+
+<!-- end{Sinput} !-->
+
+<p class='integer'>38</p>
+
+<!--\end{Schunk}!-->
+In the interest of speed we provide a pre-computed version
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> data(plierResult)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+Visualize the U matrix with default cutoffs
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> plotU(plierResult, auc.cutoff = 0.75, pval.cutoff = 0.01, top = 3)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+Visualize the U matrix with more permissive cutoffs
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> plotU(plierResult, auc.cutoff = 0.6, pval.cutoff = 0.05, top = 3)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+We can correlate the decomposition result with SPVs from CellCODE. We have nice one-to-one  correspondence, though the "DendriticCell" signature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> data(SPVs)</xmp></p>
+
+
+
+<p><xmp class=command>> plotMat(cor(t(plierResult$B), SPVs), scale = F)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+We can see that LVs  8, 9,12, 19, 21, 24  roughly correspond to major cell-types and we can use this to derive data-driven cell-type markers, which can be plugged into the CellCODE pipeline.
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> markers = plierResToMarkers(plierResult, allPaths, index = c(21, </xmp></p>
+
+<p><xmp class=command>>     24, 19, 12, 9, 8))</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+We can also visualize the top genes and their pathway associations. Note: only LVs with pathway association are plotted.
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> indexToPlot = which(apply(plierResult$Uauc, 2, max) > 0.75)</xmp></p>
+
+
+
+<p><xmp class=command>> plotTopZ(plierResult, vacDataN, allPaths, top = 5, index = indexToPlot)</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+
+Let's plot some of the less reliable LVs
+<!-- begin{Schunk} !-->
+<!-- begin{Sinput} !-->
+
+<p><xmp class=command>> plotTopZ(plierResult, vacDataN, allPaths, top = 15, index = c(17, </xmp></p>
+
+<p><xmp class=command>>     29))</xmp></p>
+
+
+<!--\end{Sinput}!-->
+
+<!--\end{Schunk}!-->
+We can see that in this case not all genes have the pathway(s) annotation.
+
+\end{document}

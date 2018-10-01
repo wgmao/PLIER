@@ -19,8 +19,31 @@ library(PLIER)
 @
 \section{Some Notes}
 PLIER runs reasonably fast but to get the best performance we recommend that you use linear algebra libraries optimized for your system. For Ubuntu and Windows you can follow instructions at http://brettklamer.com/diversions/statistical/faster-blas-in-r/.
+
+\section{Human whole blood}
+Load  the data
+<<echo=TRUE>>=
+data(bloodCellMarkersIRISDMAP)
+data(canonicalPathways)
+data(dataWholeBlood) 
+@
+Combine markers and canonical pathways into one pathway matrix
+<<echo=TRUE>>=
+allPaths=combinePaths(bloodCellMarkersIRISDMAP, canonicalPathways)
+@
+Run PLIER with all default parameters. We set doCrossval=F to turn off gene hold-out cross-validation. Since we want to check correspondance between estimates and measured proportions it is best to use all the of the available pathway information.
+<<echo=TRUE>>=
+plierResult=PLIER(dataWholeBlood, allPaths, doCrossval=F)
+@
+We can compare the results to known proportions. (Note: one of the samples does not have proportion measurements)
+<<echo=TRUE>>=
+data(majorCellTypes)
+corOut=cor(t(plierResult$B[, rownames(majorCellTypes)]), majorCellTypes, method="s")
+pheatmap(corOut)
+apply(corOut,2,max)
+@
 \section{Vaccination Dataset}
-Load data
+Load data. Here we also include the Cibersort LM22 signature are markers (svmMarkers).
 <<echo=TRUE>>=
 data(bloodCellMarkersIRISDMAP)
 data(svmMarkers)
@@ -32,13 +55,26 @@ Construct a joint pathway matrix by merging canonicalPathways, bloodCellMarkersI
 allPaths=combinePaths(bloodCellMarkersIRISDMAP, svmMarkers, canonicalPathways)
 cm.genes=commonRows(allPaths, vacData)
 @
-Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 26. Note: num.pc() is quite conservative and we recommend to set this value about 30 to 50\% higher. We set  k=34 and all other parameters to be default. We set the seed to get reprducible results for held-out pathway genes.
+Normalize the data and approximate the number of latent variables in the data by num.pc(). The result is 27. Note: num.pc() is quite conservative and we recommend to set this value about 1.5 to 2 times higher. We set  k=40 and all other parameters to be default. 
+
 <<echo=TRUE>>=
 vacDataN=rowNorm(vacData)
 num.pc(vacDataN)
-#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T, seed = 123)
+#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T)
 @
-In the interest of speed we provide a pre-computed version though for this example it will only take less than a minute.
+In this example we we also precompute some quantities in order to make re-running PLIER with different parameters (such as k) faster. We will need the SVD decomposition on the same set of genes (for large datasets use rsvd for speed). 
+<<echo=TRUE>>=
+vacData.svd=svd(vacDataN[cm.genes,])
+@
+Also, the pathway matrix pseudo-inverse. This is used to pre-select pathways for optimization.
+<<echo=TRUE>>=
+Chat=computeChat(allPaths[cm.genes,])
+@
+<<echo=TRUE>>=
+#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=40, svdres=vacData.svd, Chat=Chat)
+
+@
+In the interest of speed we provide a pre-computed version though for this example it will only take a couple of minutes.
 <<echo=TRUE>>=
 data(plierResult)
 @
@@ -55,33 +91,88 @@ plotU(plierResult, auc.cutoff = 0.6, fdr.cutoff = 0.2, top = 3)
 We can correlate the decomposition result with SPVs from CellCODE like this.
 <<echo=TRUE>>=
 data(SPVs)
-plotMat(cor(t(plierResult$B), SPVs), scale = F)
+plotMat(corout<-cor(t(plierResult$B), SPVs, method="s"), scale = F)
+paste(sort(apply(corout,2, which.max)), collapse=", ")
 @
- We have nice one-to-one  correspondence, though the "DendriticCell"ignature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
+ We have nice one-to-one  correspondence, though the "DendriticCell" signature from CellCODE is more closely related to the Type-I interferon transcriptional response so it is probably not cell-type induced variation.
 
-We can see that LVs  1, 8, 9, 11, 16, 21, 33  roughly correspond to major cell-types and we can use this to derive data-driven cell-type markers, which can be plugged into the CellCODE pipeline. 
+We can see that LVs  1, 2, 9, 12, 21, 28, 38  roughly correspond to major cell-types and we can use this to derive data-driven cell-type markers, which can be plugged into the CellCODE pipeline. 
 <<echo=TRUE>>=
-markers=plierResToMarkers(plierResult, allPaths, index = c( 1, 8, 9, 11, 16, 21, 33))
+markers=plierResToMarkers(plierResult, allPaths, 
+                          index = c( 1, 2, 9, 12, 21, 28, 38))
 colnames(markers)
 @
 
 We can also visualize the top genes and their pathway associations. Note: only LVs with pathway association are plotted.
 <<echo=TRUE>>=
-indexToPlot=which(apply(plierResult$Uauc,2,max)>0.75)
+indexToPlot=which(apply(plierResult$Uauc*(plierResult$Up<0.001),2,max)>0.75)
 plotTopZ(plierResult, vacDataN, allPaths, top = 5, index =  indexToPlot)
 @
 
 Let's plot some of the less reliable LVs
 <<echo=TRUE, tidy=T>>=
-plotTopZ(plierResult, vacDataN, allPaths, top = 15, index =  c(3,32))
+plotTopZ(plierResult, vacDataN, allPaths, top = 15, index =  c(3))
 @
 We can see that in this case not all genes have the pathway(s) annotation.
 
 
-Since each LV may (and often is) be associated with more than one pathway it can be useful to visualize all the different annotations. We can also plot more genes since for some small ro weakly predicted pathways they may be quite far from the top.
+Since each LV may  be associated with more than one pathway  it can be useful to visualize all the different annotations. We can also plot more genes since for some small or weakly predicted pathways the annotated genes may be quite far from the top.
 <<echo=TRUE, fig.height=12, tidy=T>>=
-plotTopZallPath(plierResult, vacDataN, allPaths, top = 50, index =  c(32))
+plotTopZallPath(plierResult, vacDataN, allPaths, top = 40, index =  c(3))
 @
 
+\section(single-cell RNAseq from Usokin et al.)
 
+Load the relevant data
+<<echo=TRUE, fig.height=12, tidy=T>>=
+data("chemgenPathways")
+data("canonicalPathways")
+data("human2Mouse")
+data("dataUsoskin")
+data("cellsUsoskin")
+@
+Create the combined pathway matrix
+<<echo=TRUE, fig.height=12, tidy=T>>=
+usoskinPath=combinePaths(canonicalPathways, chemgenPathways)
+@
+
+Map the pathway matrix to mouse names
+<<echo=TRUE, fig.height=12, tidy=T>>=
+usoskinPath=mapPathway(usoskinPath, human2Mouse)
+@
+Select the subset of genes that have prior information and compute the pathway "Chat" (this saves time when the pathway matrix is large and we want to run PLIER multiple times)
+<<echo=TRUE, fig.height=12, tidy=T>>=
+cm=commonRows(usoskin, usoskinPath)
+usoskinChat=computeChat(usoskinPath[cm,])
+@
+
+Compute the SVD and set the rownames of u and  v. This makes sure  names propogate when we apply data smoothing below.
+<<echo=TRUE, fig.height=12, tidy=T>>=
+dataUsoskin.svd=svd(rowNorm(dataUsoskin[cm,]))
+rownames(dataUsoskin.svd$u)=cm
+rownames(dataUsoskin.svd$v)=colnames(dataUsoskin)
+@
+Calculate the number of PCs.
+<<echo=TRUE, fig.height=12, tidy=T>>=
+num.pc(dataUsoskin.svd)
+@
+Smooth the data with double that number
+<<echo=TRUE, fig.height=12, tidy=T>>=
+dataUsoskin.smooth=DataSmooth(dataUsoskin.svd, 46*2)
+
+@
+Run PLIER with k=num.pc. In contrast to bulk RNAseq data where increasing k seems to be benefitial and the default suggestion is k=2*num.pc for single cell data it appears that conservative k give better results. Here we just use 46 from above. As this takes some time we have can preload the results
+<<echo=TRUE, fig.height=12, tidy=T>>=
+#usoskinRes=PLIER(rowNorm(dataUsoskin.smooth), usoskinPath[cm,], k=46, svdres = dataUsoskin.svd, Chat=usoskinChat)
+data(usoskinRes)
+@
+Plot the U matrix with a stringent cutoff FDR=0.01
+<<echo=TRUE, fig.height=12, tidy=T>>=
+plotU(usoskinRes, fdr.cutoff=0.01)
+@
+Look at LV10, with and without regression=T
+<<echo=TRUE, fig.height=12, tidy=T>>=
+plotTopZallPath(usoskinRes, dataUsoskin.smooth, usoskinPath, index = 10, top = 40, regress = F, fdr.cutoff = 0.01)
+plotTopZallPath(usoskinRes, dataUsoskin.smooth, usoskinPath, index = 10, top = 40, regress = T, fdr.cutoff = 0.01)
+@
 \end{document}
