@@ -49,7 +49,7 @@ DataSmooth=function(svdres,k){
   ds
 }
 #' Rename pathway matrix gene names. Useful for species conversion
-#' @param pathway svd result 
+#' @param pathway pathway matrix
 #' @param map Gene name map. A single column data.frame or matrix with map-from in row names and map-to in the first column
 #' @export
 mapPathway=function(pathway, map){
@@ -163,6 +163,7 @@ max(plierRes$summary[plierRes$summary[,5]<fdr.cutoff,4])
 #' @param plierRes A PLIER result
 #' @param top The number of pathway to use. Only the top pathway (one with the largest coefficient) is used by default
 #' @param fdr.cutoff The cross-validation significance cutoff for a pathway to be considered for naming. If no pathways satisfy the cutoff the raw coefficients are used.
+#' @use Choice of coef or AUC, whether LVs are named based on U coefficients or AUCs. Defualt: coef.
 #' @export
 nameB=function(plierRes, top=1, fdr.cutoff=0.01, use=c("coef", "AUC")){
 use=match.arg(use, c("coef", "AUC"))
@@ -684,6 +685,7 @@ plotU=function(plierRes, auc.cutoff=0.6, fdr.cutoff=0.05, indexCol=NULL, indexRo
   if(is.null(indexRow)){
     indexRow=1:nrow(plierRes$U)
   }
+  
   U=plierRes$U
   pval.cutoff=max(plierRes$summary[plierRes$summary[,5]<fdr.cutoff,4])
   U[plierRes$Uauc<auc.cutoff]=0
@@ -695,6 +697,7 @@ plotU=function(plierRes, auc.cutoff=0.6, fdr.cutoff=0.05, indexCol=NULL, indexRo
     
     U[U[,i]<ct,i]=0
   }
+  rownames(U)=strtrim(rownames(U), 30)
   if(sort.row){
     Utmp=sweep(sign(U), 2,1:ncol(U)*100,  "*")
     Um=apply(Utmp,1,max)

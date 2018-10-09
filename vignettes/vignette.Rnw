@@ -10,7 +10,7 @@ concordance=TRUE
 @
 
 <<setup, include=FALSE, cache=FALSE, tidy=TRUE>>=
-options(tidy=TRUE, width.cutoff=50)
+options(tidy=TRUE, width.cutoff=30)
 @
 
 
@@ -31,19 +31,21 @@ Combine markers and canonical pathways into one pathway matrix
 <<echo=TRUE>>=
 allPaths=combinePaths(bloodCellMarkersIRISDMAP, canonicalPathways)
 @
-Run PLIER with all default parameters. We set doCrossval=F to turn off gene hold-out cross-validation. Since we want to check correspondance between estimates and measured proportions it is best to use all the of the available pathway information.
+Run PLIER with all default parameters. \\
+Note: we can also  set doCrossval=F to turn off gene hold-out cross-validation. If all we care about is  correlation with measured proportions it is best to use all the of the available pathway information. However, with that setting the AUCs and p-values for LV-pathway association will be anti-conservative. 
 <<echo=TRUE>>=
-plierResult=PLIER(dataWholeBlood, allPaths, doCrossval=F)
+plierResult=PLIER(dataWholeBlood, allPaths)
 @
 We can compare the results to known proportions. (Note: one of the samples does not have proportion measurements)
 <<echo=TRUE>>=
 data(majorCellTypes)
 corOut=cor(t(plierResult$B[, rownames(majorCellTypes)]), majorCellTypes, method="s")
+rownames(corOut)=strtrim(rownames(corOut),30)
 pheatmap(corOut)
 apply(corOut,2,max)
 @
 \section{Vaccination Dataset}
-Load data. Here we also include the Cibersort LM22 signature are markers (svmMarkers).
+Load data. Here we also include the Cibersort LM22 signature as markers (svmMarkers).
 <<echo=TRUE>>=
 data(bloodCellMarkersIRISDMAP)
 data(svmMarkers)
@@ -60,7 +62,6 @@ Normalize the data and approximate the number of latent variables in the data by
 <<echo=TRUE>>=
 vacDataN=rowNorm(vacData)
 num.pc(vacDataN)
-#plierResult=PLIER(vacDataN[cm.genes,], allPaths[cm.genes,],k=34, trace=T)
 @
 In this example we we also precompute some quantities in order to make re-running PLIER with different parameters (such as k) faster. We will need the SVD decomposition on the same set of genes (for large datasets use rsvd for speed). 
 <<echo=TRUE>>=
@@ -142,7 +143,7 @@ usoskinPath=mapPathway(usoskinPath, human2Mouse)
 @
 Select the subset of genes that have prior information and compute the pathway "Chat" (this saves time when the pathway matrix is large and we want to run PLIER multiple times)
 <<echo=TRUE, fig.height=12, tidy=T>>=
-cm=commonRows(usoskin, usoskinPath)
+cm=commonRows(dataUsoskin, usoskinPath)
 usoskinChat=computeChat(usoskinPath[cm,])
 @
 

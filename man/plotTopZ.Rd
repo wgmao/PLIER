@@ -21,6 +21,8 @@ plotTopZ(plierRes, data, priorMat, top = 10, index = NULL, regress = F,
 \item{regress}{remove the effect of all other LVs before plotting top genes, will take longer but can be useful to see distinct patterns in highly correlated LVs.}
 
 \item{allLVs}{plot even the LVs that have no pathway association}
+
+\item{...}{Additional arguments to be passed to pheatmap, such as a column annotation data.frame (annotation_col). See ?pheatmap for details.}
 }
 \description{
 visualize the top genes contributing to the LVs
