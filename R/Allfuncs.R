@@ -327,10 +327,12 @@ getAUC=function(plierRes, data, priorMat){
 #' @param seed Set the seed for pathway cross-validation
 #' @param  allGenes Use all genes. By default only genes in the priorMat matrix are used.
 #' @param rseed Set this option to use a random initialization, instead of SVD
+#' @param pathwaySelection Pathways to be optimized with elstic-net penalty are preselected based on ridge regression results. "Complete" uses all top  pathways to fit individual LVs. "Fast" uses only the top pathways for the single LV in question.
 #' @export
 
-PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL){
+PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL, pathwaySelection=c("complete", "fast")){
   
+  pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
   #Ur is the ranked matrix of pathway relevance
   solveU=function(Z, Ur,priorMat,  L3, penalty.factor, glm_alpha){
 
@@ -340,8 +342,12 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
     U[]=0
     
     for (j in 1:ncol(U)){
-     # selection=which(Ur[,j]<=maxPath)
-     selection=ii
+      if(pathwaySelection=="fast"){
+      selection=which(Ur[,j]<=maxPath)
+      }
+      else{
+      selection=ii
+      }
        tmp=glmnet(y=Z[,j], x=priorMat[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
       U[selection,j]=as.numeric(tmp$beta)
     }
@@ -409,9 +415,7 @@ if(doCrossval){
   BdiffCount=0
   if(is.null(Chat)){
     Cp=crossprod(C)
-    Chat=pinv.ridge(Cp, 5)%*%(t(C))
-  
-  
+    Chat=pinv.ridge(crossprod(C), 5)%*%(t(C))
   }
   YsqSum=sum(Y^2)
   #compute svd and use that as the starting point
