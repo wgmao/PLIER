@@ -158,12 +158,13 @@ getCutoff=function(plierRes,  fdr.cutoff=0.01){
 max(plierRes$summary[plierRes$summary[,5]<fdr.cutoff,4])
 }
 
+
 #' names latent variables according to their pathway useage (if any)
 #' 
 #' @param plierRes A PLIER result
 #' @param top The number of pathway to use. Only the top pathway (one with the largest coefficient) is used by default
 #' @param fdr.cutoff The cross-validation significance cutoff for a pathway to be considered for naming. If no pathways satisfy the cutoff the raw coefficients are used.
-#' @use Choice of coef or AUC, whether LVs are named based on U coefficients or AUCs. Defualt: coef.
+#' @param Choice of coef or AUC, whether LVs are named based on U coefficients or AUCs. Defualt: coef.
 #' @export
 nameB=function(plierRes, top=1, fdr.cutoff=0.01, use=c("coef", "AUC")){
 use=match.arg(use, c("coef", "AUC"))
@@ -1096,5 +1097,379 @@ resid=function(dat, lab, useMean=T){
     out=sweep(out,1,apply(dat,1,mean), "+")  
   }
   
+  out
+}
+
+
+#' Conditional PLIER function (experimental)
+#' 
+#' @param data the data to be processed with genes in rows and samples in columns. Should be z-scored or set scale=T 
+#' @param priorMat the binary prior information matrix with genes in rows and pathways/genesets in columns
+#' @param svdres Pre-computed result of the svd decomposition for data
+#' @param k The number of latent variables to return, leave as NULL to be set automatically using the num.pc "elbow" method
+#' @param L1 L1 constant, leave as NULL to automatically select a value
+#' @param L2 L2 constant, leave as NULL to automatically select a value
+#' @param L3 L3 constant, leave as NULL to automatically select a value. Sparsity in U should be instead controlled by setting frac
+#' @param frac The fraction of LVs that should have at least 1 prior inforamtion association, used to automatically set L3
+#' @param max.iter Maximum number of iterations to perform
+#' @param trace Display progress information
+#' @param scale Z-score the data before processing
+#' @param Chat A ridge inverse of priorMat, used to select active pathways, expensive to compute so can be precomputed when running PLIER multiple times
+#' @param maxPath The maximum number of active pathways per latent variable
+#' @param doCrossval Whether or not to do real cross-validation with held-out pathway genes. Alternatively, all gene annotations are used and only pseudo-crossvalidation is done. The latter option may be preferable if some pathways of interest have few genes. 
+#' @param penalty.factor A vector equal to the number of columns in priorMat. Sets relative penalties for different pathway/geneset subsets. Lower penalties will make a pathway more likely to be used. Only the relative values matter. Internally rescaled.
+#' @param glm_alpha Set the alpha for elastic-net
+#' @param minGenes The minimum number of genes a pathway must have to be considered
+#' @param tol Convergence threshold
+#' @param seed Set the seed for pathway cross-validation
+#' @param  allGenes Use all genes. By default only genes in the priorMat matrix are used.
+#' @param rseed Set this option to use a random initialization, instead of SVD
+#' @param pathwaySelection Pathways to be optimized with elstic-net penalty are preselected based on ridge regression results. "Complete" uses all top  pathways to fit individual LVs. "Fast" uses only the top pathways for the single LV in question.
+#' @param conditional Run in conditional mode. Default is true.
+#' @export
+PLIERconditional=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL, pathwaySelection=c("complete", "fast"), conditional=T){
+  
+  pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
+  #Ur is the ranked matrix of pathway relevance
+  solveU=function(Z, Ur,priorMat,  L3, penalty.factor, glm_alpha){
+    
+    ii=which(apply(Ur,1,min)<=maxPath)
+    
+    U=copyMat(Ur)
+    U[]=0
+    
+    for (j in 1:ncol(U)){
+      if(pathwaySelection=="fast"){
+        selection=which(Ur[,j]<=maxPath)
+      }
+      else{
+        selection=ii
+      }
+      if(conditional){
+        iigenes=which(Z[,j]>0)
+      }
+      else{
+        iigenes=1:nrow(Z)
+      }
+      tmp=glmnet(y=Z[iigenes,j], x=priorMat[iigenes,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
+      U[selection,j]=as.numeric(tmp$beta)
+    }
+    
+    return(U)
+  }
+  
+  
+  
+  
+  if(scale){
+    Y=rowNorm(data)
+  }
+  else{
+    Y=data
+  }
+  
+  if(nrow(priorMat)!=nrow(data) || !all(rownames(priorMat)==rownames(data))){
+    if(!allGenes){
+      cm=commonRows(data, priorMat)
+      message(paste("Selecting common genes:", length(cm)))
+      priorMat=priorMat[cm,]
+      Y=Y[cm,]
+    }
+    else{
+      extra.genes=setdiff(rownames(data), rownames(priorMat))
+      eMat=matrix(0, nrow=length(extra.genes), ncol=ncol(priorMat))
+      rownames(eMat)=extra.genes
+      priorMat=rbind(priorMat, eMat)
+      priorMat=priorMat[rownames(data),]
+    }
+    
+  }
+  numGenes=colSums(priorMat)
+  
+  heldOutGenes=list()
+  iibad=which(numGenes<minGenes)
+  priorMat[, iibad]=0
+  message(paste("Removing", length(iibad), "pathways with too few genes"))
+  if(doCrossval){
+    
+    
+    priorMatCV=priorMat
+    if(!is.null(seed))
+      set.seed(seed)
+    for(j in 1:ncol(priorMatCV)){
+      iipos=which(priorMatCV[,j]>0)
+      iiposs=sample(iipos, length(iipos)/5)
+      priorMatCV[iiposs,j]=0
+      heldOutGenes[[colnames(priorMat)[j]]]=rownames(priorMat)[iiposs]
+      
+    }
+    C = priorMatCV
+  }
+  else{
+    C=priorMat
+  }
+  
+  nc=ncol(priorMat)
+  ng=nrow(data)
+  ns=ncol(data)
+  
+  Bdiff=-1
+  BdiffTrace=double()
+  BdiffCount=0
+  if(is.null(Chat)){
+    Cp=crossprod(C)
+    Chat=pinv.ridge(crossprod(C), 5)%*%(t(C))
+  }
+  YsqSum=sum(Y^2)
+  #compute svd and use that as the starting point
+  
+  
+  if(is.null(svdres)){
+    message("Computing SVD")
+    if(ns>500){
+      message("Using rsvd")
+      set.seed(123456);svdres=rsvd(Y, k=min(ns, max(200, ns/4)), q=3)
+    }
+    else{
+      svdres=svd(Y)
+    }
+    message("Done")
+  }
+  if(is.null(k)){
+    k=num.pc(svdres)*2
+    message("k is set to ", k)
+  }
+  if(nrow(svdres$u)!=nrow(Y)){
+    message("SVD U has the wrong number of rows")
+    
+    if(!is.null(rownames(svdres$u))){
+      message("Selecting via rownames of U")
+      Z=svdres$u[rownames(Y),1:k]
+    }
+    else{
+      message("No rownames for svdres$u: Recomputing SVD")
+      if(ns>500){
+        if(!is.null(seed))
+          set.seed(seed)
+        set.seed(123456);svdres=rsvd(Y, k, q=3)
+      }
+      else{
+        svdres=svd(Y)
+      }
+      
+      message("Done")
+    }
+  }
+  else{
+    Z=svdres$u[, 1:k]
+  }
+  
+  if(!is.null(rseed)){
+    message("using random start")
+    set.seed(rseed)
+    B=t(apply(B, 1, sample))
+    Z=t(apply(Z,2,sample))
+  }
+  
+  
+  if(is.null(L2)){
+    show(svdres$d[k])
+    L2=svdres$d[k]
+    print(paste0("L2 is set to ",L2))
+  }
+  if(is.null(L1)){
+    L1=L2/2
+    print(paste0("L1 is set to ",L1))
+  }
+  
+  
+  
+  B=t(svdres$v[1:ncol(Y), 1:k]%*%diag(svdres$d[1:k]))
+  U=matrix(0,nrow=ncol(C), ncol=k)
+  
+  show(dim(B))
+  round2=function(x){signif(x,4)}
+  message(paste0("errorY (SVD based:best possible) = ", round2(mean((Y-Z%*%B)^2))))
+  
+  Z[Z<0]=0
+  
+  
+  
+  iter.full.start=iter.full=20
+  
+  curfrac=0
+  nposlast=Inf
+  npos=-Inf
+  if(!is.null(L3)){
+    L3.given=T
+  }
+  else{
+    L3.given=F
+  }
+  
+  for ( i in 1:max.iter){
+    
+    
+    
+    
+    
+    if(i>=iter.full.start){
+      
+      #Compute Us
+      Us=Chat%*%colSumNorm(Z)
+      
+      Us[Us<0]=0
+      Us=apply(-Us,2,rank)
+      
+      #    ii=which(apply(Us,1,min)<=maxPath)
+      
+      if(i==iter.full & !L3.given){
+        
+        
+        message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
+        biter=0
+        
+        
+        if(abs(frac-curfrac)>1/k){
+          #set up the limits
+          if(curfrac>frac){
+            #increase penatly
+            if(is.null(L3)){
+              L3_1=0.000001
+              L3_2=1
+            }
+            else{
+              L3_1=L3
+              L3_2=L3*100
+            }
+          }
+          else{
+            #decrease
+            if(is.null(L3)){
+              
+              L3_1=0.000001
+              L3_2=1
+            }
+            else{
+              L3_1=L3/100
+              L3_2=L3
+            }
+          }
+          
+          
+          while (biter < 150&(biter<1|abs(frac-curfrac)>1/k|npos==0)){
+            
+            U=solveU(Z, Us, priorMat,  L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
+            
+            nposlast=npos
+            curfrac=(npos<-sum(apply(U,2,max)>0))/k
+            if(T){
+              message(paste0(npos, " positive columns at L3=", round(L3use,6)))
+            }
+            if(curfrac>frac){  #increase penatly
+              #check if the limits have been reached
+              if((L3_2-L3_1)<1e-7){
+                L3_2=L3_2*100 
+              }
+              L3_1=(L3_1+L3_2)/2
+            }
+            else{#decrease
+              if((L3_2-L3_1)<1e-7){
+                L3_1=L3_1/100 
+              }
+              L3_2=(L3_1+L3_2)/2
+              
+            }
+            
+            biter=biter+1
+            #show(c(npos, nposlast, frac, curfrac, abs(frac-curfrac), 1/k))
+          }
+          L3=L3use
+          if(trace){
+            message(paste0("L3 is set to ", round(L3, 6), " in ", biter, " iterations"))
+          }
+        }
+        else{
+          message("L3 not changed")
+        }
+        iter.full=iter.full+iter.full.start
+      }
+      
+      #find the active pathways
+      #  ii=which(apply(Us,1,min)<=maxPath)
+      U=solveU(Z, Us, priorMat, L3, penalty.factor, glm_alpha)
+      curfrac=(npos<-sum(apply(U,2,max)>0))/k
+      Z1=Y%*%t(B)
+      Z2=L1*C%*%U
+      Z2[Z==0]=0
+      ratio=median((Z2/Z1)[Z2>0&Z1>0])
+      Z=(Z1+Z2)%*%solve(tcrossprod(B)+L1*diag(k))
+    }
+    
+    else{
+      Z=(Y%*%t(B))%*%solve(tcrossprod(B)+L1*diag(k))
+    }
+    
+    
+    Z[Z<0]=0
+    
+    
+    oldB=B
+    B=solve(t(Z)%*%Z+L2*diag(k))%*%t(Z)%*%Y
+    
+    
+    
+    
+    Bdiff=sum((B-oldB)^2)/sum(B^2)
+    BdiffTrace=c(BdiffTrace, Bdiff)
+    
+    
+    err0=sum((Y-Z%*%B)^2)+sum((Z-C%*%U)^2)*L1+sum(B^2)*L2
+    if(trace & i >=iter.full.start){
+      
+      message(paste0("iter",i, " errorY= ",erry<-round2(mean((Y-Z%*%B)^2)), ", prior information ratio= ", round(ratio,2), ", Bdiff= ",round2(Bdiff), ", Bkappa=", round2(kappa(B))), ";pos. col. U=", sum(colSums(U)>0))
+    }
+    else if (trace){
+      message(paste0("iter",i, " errorY= ",erry<-round2(mean((Y-Z%*%B)^2)), ", Bdiff= ",round2(Bdiff), ", Bkappa=", round2(kappa(B))))
+    }
+    
+    if(i>52&&Bdiff>BdiffTrace[i-50]){
+      BdiffCount=BdiffCount+1
+      message("Bdiff is not decreasing")
+    }
+    else if(BdiffCount>1){
+      BdiffCount=BdiffCount-1
+    }
+    
+    if(Bdiff<tol){
+      message(paste0("converged at  iteration ", i))
+      break
+    }
+    if( BdiffCount>5){
+      message(paste0("converged at  iteration ", i, " Bdiff is not decreasing"))
+      break
+    }
+    
+  }
+  rownames(U)=colnames(priorMat)
+  colnames(U)=rownames(B)=paste0("LV", 1:k)
+  
+  out=list(residual=(Y-Z%*%B), B=B, Z=Z, U=U, C=C,  L1=L1, L2=L2, L3=L3, heldOutGenes=heldOutGenes)
+  
+  if(doCrossval){
+    outAUC=crossVal(out, Y, priorMat, priorMatCV)
+  }
+  else{
+    message("Not using cross-validation. AUCs and p-values may be over-optimistic")
+    outAUC=getAUC(out, Y, priorMat)
+  }
+  out$withPrior=which(colSums(out$U)>0)
+  out$Uauc=outAUC$Uauc
+  out$Up=outAUC$Upval
+  out$summary=outAUC$summary
+  tt=apply(out$Uauc,2,max)
+  message(paste("There are", sum(tt>0.70), " LVs with AUC>0.70"))
+  
+  rownames(out$B)=nameB(out)
   out
 }
