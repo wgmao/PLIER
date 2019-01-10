@@ -1127,7 +1127,7 @@ resid=function(dat, lab, useMean=T){
 #' @param pathwaySelection Pathways to be optimized with elstic-net penalty are preselected based on ridge regression results. "Complete" uses all top  pathways to fit individual LVs. "Fast" uses only the top pathways for the single LV in question.
 #' @param conditional Run in conditional mode. Default is true.
 #' @export
-PLIERconditional=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL, pathwaySelection=c("complete", "fast"), conditional=T){
+PLIERconditional=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL, pathwaySelection=c("complete", "fast"), conditional=T, weight=10){
   
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
   #Ur is the ranked matrix of pathway relevance
@@ -1145,13 +1145,18 @@ PLIERconditional=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, 
       else{
         selection=ii
       }
-      if(conditional){
-        iigenes=which(Z[,j]>0)
-      }
-      else{
+    #  if(conditional){
+    #    iigenes=which(Z[,j]>0)
+    #  }
+    #  else{
         iigenes=1:nrow(Z)
-      }
-      tmp=glmnet(y=Z[iigenes,j], x=priorMat[iigenes,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
+    #  }
+      Zr=rank(-Z[iigenes])
+      W=double(length(Zr))
+      W[]=1
+      W[Zr<=50]=weight
+    
+      tmp=glmnet(y=Z[iigenes,j], weights = W, x=priorMat[iigenes,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
       U[selection,j]=as.numeric(tmp$beta)
     }
     
