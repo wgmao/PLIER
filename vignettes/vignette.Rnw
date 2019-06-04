@@ -33,7 +33,7 @@ allPaths=combinePaths(bloodCellMarkersIRISDMAP, canonicalPathways)
 @
 Run PLIER with all default parameters. \\
 Note: we can also  set doCrossval=F to turn off gene hold-out cross-validation. If all we care about is  correlation with measured proportions it is best to use all the of the available pathway information. However, with that setting the AUCs and p-values for LV-pathway association will be anti-conservative. 
-<<echo=TRUE>>=
+<<echo=TRUE>>
 plierResult=PLIER(dataWholeBlood, allPaths)
 @
 We can compare the results to known proportions. (Note: one of the samples does not have proportion measurements)

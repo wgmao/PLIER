@@ -2,7 +2,7 @@
 
 export(DataSmooth)
 export(PLIER)
-export(PLIERconditional)
+export(PLIERsparse)
 export(combinePaths)
 export(commonRows)
 export(computeChat)
