@@ -640,7 +640,7 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
   rownames(U)=colnames(priorMat)
   colnames(U)=rownames(B)=paste0("LV", 1:k)
   
-  out=list(residual=(Y-Z%*%B), B=B, Z=Z, U=U, C=C, numActPath=length(ii), L1=L1, L2=L2, L3=L3, heldOutGenes=heldOutGenes)
+  out=list(residual=(Y-Z%*%B), B=B, Z=Z, U=U, C=C, L1=L1, L2=L2, L3=L3, heldOutGenes=heldOutGenes)
   
   if(doCrossval){
     outAUC=crossVal(out, Y, priorMat, priorMatCV)
