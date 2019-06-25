@@ -237,13 +237,20 @@ crossVal=function(plierRes, data, priorMat, priorMatcv){
     
     iipath=which(plierRes$U[,i]>0)
     
+    if (length(iipath) > 1){
     for(j in iipath){
       iiheldout=which((rowSums(priorMat[,iipath])==0) |(priorMat[,j]>0&priorMatcv[,j]==0))
       aucres=AUC(priorMat[iiheldout,j], plierRes$Z[iiheldout,i])
       out=rbind(out,c(colnames(priorMat)[j], i, aucres$auc, aucres$pval))
       Uauc[j,i]=aucres$auc
       Up[j,i]=aucres$pval
-    }
+    }}else{
+      iiheldout=which((rowSums(matrix(priorMat[,iipath],ncol=1))==0) |(priorMat[,j]>0&priorMatcv[,j]==0))
+      aucres=AUC(priorMat[iiheldout,j], plierRes$Z[iiheldout,i])
+      out=rbind(out,c(colnames(priorMat)[j], i, aucres$auc, aucres$pval))
+      Uauc[j,i]=aucres$auc
+      Up[j,i]=aucres$pval
+      }#else
   }
   out=data.frame(out,stringsAsFactors = F)
   out[,3]=as.numeric(out[,3])
