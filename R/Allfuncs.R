@@ -450,6 +450,7 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
   }
   if(is.null(k)){
     k=num.pc(svdres)*2
+    k <- min(k, floor(ncol(Y)*0.8))
     message("k is set to ", k)
   }
   
