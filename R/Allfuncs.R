@@ -245,6 +245,7 @@ crossVal=function(plierRes, data, priorMat, priorMatcv){
       Uauc[j,i]=aucres$auc
       Up[j,i]=aucres$pval
     }}else{
+      j <- iipath
       iiheldout=which((rowSums(matrix(priorMat[,iipath],ncol=1))==0) |(priorMat[,j]>0&priorMatcv[,j]==0))
       aucres=AUC(priorMat[iiheldout,j], plierRes$Z[iiheldout,i])
       out=rbind(out,c(colnames(priorMat)[j], i, aucres$auc, aucres$pval))
