@@ -477,7 +477,7 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
     message("using random start")
     set.seed(rseed)
     B=t(apply(B, 1, sample))
-    Z=t(apply(Z,2,sample))
+    Z=apply(Z,2,sample)
   }
   
   
