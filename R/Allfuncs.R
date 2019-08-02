@@ -863,24 +863,25 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
   
  
   if(method=="permutation"){
-  nn = min(c(n, m))
-  dstat <- uu$d[1:nn]^2/sum(uu$d[1:nn]^2)
-  dstat0 <- matrix(0, nrow = B, ncol = nn)
+  #nn = min(c(n, m))
+  dstat <- uu$d[1:k]^2/sum(uu$d[1:k]^2)
+  dstat0 <- matrix(0, nrow = B, ncol = k)
   for (i in 1:B) {
     dat0 <- t(apply(data, 1, sample, replace = FALSE))
     if(k==n){
       uu0 <- svd(dat0)
     }
     else{
-      set.seed(123456);uu0 <- rsvd(dat0,k, q=3)
+      set.seed(123456);
+      uu0 <- rsvd(dat0,k, q=3)
     }
-    dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
+    dstat0[i, ] <- uu0$d[1:k]^2/sum(uu0$d[1:k]^2)
   }
-  psv <- rep(1, nn)
-  for (i in 1:nn) {
+  psv <- rep(1, k)
+  for (i in 1:k) {
     psv[i] <- mean(dstat0[, i] >= dstat[i])
   }
-  for (i in 2:nn) {
+  for (i in 2:k) {
     psv[i] <- max(psv[(i - 1)], psv[i])
   }
 
