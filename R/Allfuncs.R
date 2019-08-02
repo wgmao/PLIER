@@ -197,7 +197,7 @@ nameB <- function(plierRes, top = 1, fdr.cutoff = 0.01, use = c("coef", "AUC")) 
 
 #' Computes the ridge pseudo-inverse of the prior information matrix. Used internally by PLIER but can be precomputed if running PLIER multiple times.
 #'
-#' @param gsMat The prior information matrix. The genes have to match the gene expression data to be analyzed exactly (same genes and same order(
+#' @param gsMat The prior information matrix. The genes have to match the gene expression data to be analyzed exactly (same genes and same order)
 #' @param lambda The regularization paramter
 #' @export
 computeChat <- function(gsMat, lambda = 5) {
@@ -324,8 +324,8 @@ getAUC <- function(plierRes, data, priorMat) {
 #' @param rseed Set this option to use a random initialization, instead of SVD
 #' @param pathwaySelection Pathways to be optimized with elstic-net penalty are preselected based on ridge regression results. 'Complete' uses all top  pathways to fit individual LVs. 'Fast' uses only the top pathways for the single LV in question.
 #' @export
-PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T, Chat = NULL, maxPath = 10, doCrossval = T, 
-    penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL, pathwaySelection = c("complete", "fast")) {
+PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T, Chat = NULL, maxPath = 10, doCrossval = T, penalty.factor = rep(1, 
+    ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL, pathwaySelection = c("complete", "fast")) {
     pathwaySelection <- match.arg(pathwaySelection, c("complete", "fast"))
     # Ur is the ranked matrix of pathway relevance
     solveU <- function(Z, Chat, C, L3, penalty.factor, glm_alpha) {
@@ -553,8 +553,8 @@ PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
         
         err0 <- sum((Y - Z %*% B)^2) + sum((Z - C %*% U)^2) * L1 + sum(B^2) * L2
         if (trace & i >= iter.full.start) {
-            message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", prior information ratio= ", round(ratio, 2), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))), 
-                ";pos. col. U=", sum(colSums(U) > 0))
+            message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", prior information ratio= ", round(ratio, 2), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))), ";pos. col. U=", 
+                sum(colSums(U) > 0))
         } else if (trace) {
             message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))))
         }
@@ -708,8 +708,7 @@ plotTopZ <- function(plierRes, data, priorMat, top = 10, index = NULL, regress =
     
     maxval <- max(abs(toPlot))
     
-    pheatmap(toPlot, breaks = seq(-maxval, maxval, length.out = 99), color = colorpanel(100, "green", "white", "red"), annotation_row = nncol, show_colnames = F, annotation_colors = anncol, 
-        ...)
+    pheatmap(toPlot, breaks = seq(-maxval, maxval, length.out = 99), color = colorpanel(100, "green", "white", "red"), annotation_row = nncol, show_colnames = F, annotation_colors = anncol, ...)
 }
 
 
@@ -752,8 +751,9 @@ rowNorm <- function(x) {
 #' @param B number of permutations
 #' @param seed seed for reproducibility
 #' @export
-num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
-    method <- match.arg(method, c("elbow", "permutation"))
+num.pc = function(data, method = "elbow", B = 20, seed = NULL) {
+    
+    method = match.arg(method, c("elbow", "permutation"))
     if (!is.null(seed)) {
         set.seed(seed)
     }
@@ -762,11 +762,11 @@ num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
         message("Computing svd")
         n <- ncol(data)
         m <- nrow(data)
-        data <- rowNorm(data)
+        data = rowNorm(data)
         if (n < 500) {
-            k <- n
+            k = n
         } else {
-            k <- max(200, n/4)
+            k = max(200, n/4)
         }
         if (k == n) {
             uu <- svd(data)
@@ -777,16 +777,15 @@ num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
     } else if (!is.null(data[["d"]])) {
         if (method == "permutation") {
             message("Original data is needed for permutation method.\nSetting method to elbow")
-            method <- "elbow"
+            method = "elbow"
         }
-        
-        uu <- data
+        uu = data
     }
     
     if (method == "permutation") {
-        nn <- min(c(n, m))
-        dstat <- uu$d[1:nn]^2/sum(uu$d[1:nn]^2)
-        dstat0 <- matrix(0, nrow = B, ncol = nn)
+        # nn = min(c(n, m))
+        dstat <- uu$d[1:k]^2/sum(uu$d[1:k]^2)
+        dstat0 <- matrix(0, nrow = B, ncol = k)
         for (i in 1:B) {
             dat0 <- t(apply(data, 1, sample, replace = FALSE))
             if (k == n) {
@@ -795,23 +794,46 @@ num.pc <- function(data, method = "elbow", B = 20, seed = NULL) {
                 set.seed(123456)
                 uu0 <- rsvd(dat0, k, q = 3)
             }
-            dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
+            dstat0[i, ] <- uu0$d[1:k]^2/sum(uu0$d[1:k]^2)
         }
-        psv <- rep(1, nn)
-        for (i in 1:nn) {
+        psv <- rep(1, k)
+        for (i in 1:k) {
             psv[i] <- mean(dstat0[, i] >= dstat[i])
         }
-        for (i in 2:nn) {
+        for (i in 2:k) {
             psv[i] <- max(psv[(i - 1)], psv[i])
         }
-        
         nsv <- sum(psv <= 0.1)
     } else if (method == "elbow") {
-        x <- smooth(xraw <- abs(diff(diff(uu$d))), twiceit = T)
-        # plot(x)
+        x = smooth(xraw <- abs(diff(diff(uu$d))), twiceit = T)
+        nsv = which(x < quantile(x, 0.5))[1] + 1
         
-        
-        nsv <- which(x < quantile(x, 0.5))[1] + 1
+        if (method == "permutation") {
+            nn <- min(c(n, m))
+            dstat <- uu$d[1:nn]^2/sum(uu$d[1:nn]^2)
+            dstat0 <- matrix(0, nrow = B, ncol = nn)
+            for (i in 1:B) {
+                dat0 <- t(apply(data, 1, sample, replace = FALSE))
+                if (k == n) {
+                  uu0 <- svd(dat0)
+                } else {
+                  set.seed(123456)
+                  uu0 <- rsvd(dat0, k, q = 3)
+                }
+                dstat0[i, ] <- uu0$d[1:nn]^2/sum(uu0$d[1:nn]^2)
+            }
+            psv <- rep(1, nn)
+            for (i in 1:nn) {
+                psv[i] <- mean(dstat0[, i] >= dstat[i])
+            }
+            for (i in 2:nn) {
+                psv[i] <- max(psv[(i - 1)], psv[i])
+            }
+            nsv <- sum(psv <= 0.1)
+        } else if (method == "elbow") {
+            x <- smooth(xraw <- abs(diff(diff(uu$d))), twiceit = T)
+            nsv <- which(x < quantile(x, 0.5))[1] + 1
+        }
     }
     return(nsv)
 }
@@ -958,10 +980,10 @@ plotTopZallPath <- function(plierRes, data, priorMat, top = 10, index = NULL, re
             toPlot[gi, ] <- resid(toPlot[gi, ], model.matrix(~t(plierRes$B[-i, colnames(toPlot)])))
         }
     }
-    pheatmap(tscale(toPlot), breaks = bb, color = colorpanel(101, "green", "white", "red"), annotation_row = as.data.frame(pathMat), annotation_legend = F, show_colnames = F, annotation_colors = anncol, 
-        clustering_callback = function(h, d) {
-            hclust(dist(d), method = "complete")
-        }, ...)
+    pheatmap(tscale(toPlot), breaks = bb, color = colorpanel(101, "green", "white", "red"), annotation_row = as.data.frame(pathMat), annotation_legend = F, show_colnames = F, annotation_colors = anncol, clustering_callback = function(h, 
+        d) {
+        hclust(dist(d), method = "complete")
+    }, ...)
 }
 
 
@@ -1106,19 +1128,15 @@ getEnrichmentVals <- function(plierRes, pathwayMat, ngenes = 50, auc.cutoff = 0.
 #' @param sparseL the lambda for sparsity on Z, default 0.02
 #' @param sparseType sparsity inducing penalty to use (SCAD or L1)
 #' @export
-PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T, Chat = NULL, maxPath = 10, doCrossval = T, 
-    penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL, pathwaySelection = c("complete", "fast"), sparseL = 0.01, 
-    sparseType = "SCAD") {
+PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T, Chat = NULL, maxPath = 10, doCrossval = T, penalty.factor = rep(1, 
+    ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL, pathwaySelection = c("complete", "fast"), sparseL = 0.01, sparseType = "SCAD") {
     sparseType <- match.arg(sparseType, c("SCAD", "L1"))
-    
     pathwaySelection <- match.arg(pathwaySelection, c("complete", "fast"))
     # Ur is the ranked matrix of pathway relevance
     solveU <- function(Z, Ur, C, L3, penalty.factor, glm_alpha) {
         ii <- which(apply(Ur, 1, min) <= maxPath)
-        
         U <- copyMat(Ur)
         U[] <- 0
-        
         for (j in 1:ncol(U)) {
             if (pathwaySelection == "fast") {
                 selection <- which(Ur[, j] <= maxPath)
@@ -1129,11 +1147,9 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
             iigenes <- 1:nrow(Z)
             # }
             Zr <- rank(-Z[iigenes])
-            
             tmp <- glmnet(y = Z[iigenes, j], x = priorMat[iigenes, selection], alpha = glm_alpha, lambda = L3, lower.limits = 0, penalty.factor = penalty.factor[selection])
             U[selection, j] <- as.numeric(tmp$beta)
         }
-        
         return(U)
     }
     
@@ -1158,7 +1174,6 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
         }
     }
     numGenes <- colSums(priorMat)
-    
     heldOutGenes <- list()
     iibad <- which(numGenes < minGenes)
     priorMat[, iibad] <- 0
@@ -1203,13 +1218,13 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
         }
         message("Done")
     }
+    
     if (is.null(k)) {
         k <- num.pc(svdres) * 2
         message("k is set to ", k)
     }
     if (nrow(svdres$u) != nrow(Y)) {
         message("SVD U has the wrong number of rows")
-        
         if (!is.null(rownames(svdres$u))) {
             message("Selecting via rownames of U")
             Z <- svdres$u[rownames(Y), 1:k]
@@ -1219,12 +1234,11 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
                 if (!is.null(seed)) {
                   set.seed(seed)
                 }
-                set.seed(123456)
+                et.seed(123456)
                 svdres <- rsvd(Y, k, q = 3)
             } else {
                 svdres <- svd(Y)
             }
-            
             message("Done")
         }
     } else {
@@ -1243,6 +1257,7 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
         L2 <- svdres$d[k]
         print(paste0("L2 is set to ", L2))
     }
+    
     if (is.null(L1)) {
         L1 <- L2/2
         print(paste0("L1 is set to ", L1))
@@ -1272,15 +1287,11 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
     
     for (i in 1:max.iter) {
         if (i >= iter.full.start) {
-            
             # Compute Us
             Us <- Chat %*% colSumNorm(Z)
-            
             Us[Us < 0] <- 0
             Us <- apply(-Us, 2, rank)
-            
             # ii=which(apply(Us,1,min)<=maxPath)
-            
             if (i == iter.full & !L3.given) {
                 message(paste0("Updating L3, current fraction= ", round(curfrac, 4), ", target=", frac))
                 biter <- 0
@@ -1328,7 +1339,6 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
                     }
                     
                     biter <- biter + 1
-                    # show(c(npos, nposlast, frac, curfrac, abs(frac-curfrac), 1/k))
                   }
                   L3 <- L3use
                   if (trace) {
@@ -1351,7 +1361,6 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
         } else {
             Z <- (as.matrix(Y) %*% t(B)) %*% solve(tcrossprod(B) + L1 * diag(k))
         }
-        
         Zraw <- Z
         Z[Z < 0] <- 0
         iipath <- which(colSums(U) > 0)
@@ -1371,8 +1380,8 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
         
         err0 <- sum((Y - Z %*% B)^2) + sum((Z - C %*% U)^2) * L1 + sum(B^2) * L2
         if (trace & i >= iter.full.start) {
-            message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", prior information ratio= ", round(ratio, 2), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))), 
-                ";pos. col. U=", sum(colSums(U) > 0))
+            message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", prior information ratio= ", round(ratio, 2), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))), ";pos. col. U=", 
+                sum(colSums(U) > 0))
         } else if (trace) {
             message(paste0("iter", i, " errorY= ", erry <- round2(mean((Y - Z %*% B)^2)), ", Bdiff= ", round2(Bdiff), ", Bkappa=", round2(kappa(B))))
         }
@@ -1412,5 +1421,5 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
     message(paste("There are", sum(tt > 0.7), " LVs with AUC>0.70"))
     out$Zraw <- Zraw
     rownames(out$B) <- nameB(out)
-    out
+    return(out)
 }
