@@ -320,14 +320,36 @@ getAUC <- function(plierRes, data, priorMat) {
 #' @param minGenes The minimum number of genes a pathway must have to be considered
 #' @param tol Convergence threshold
 #' @param seed Set the seed for pathway cross-validation
-#' @param  allGenes Use all genes. By default only genes in the priorMat matrix are used.
+#' @param allGenes Use all genes. By default only genes in the priorMat matrix are used.
 #' @param rseed Set this option to use a random initialization, instead of SVD
 #' @param pathwaySelection Pathways to be optimized with elstic-net penalty are preselected based on ridge regression results. 'Complete' uses all top  pathways to fit individual LVs. 'Fast' uses only the top pathways for the single LV in question.
 #' @export
-PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F, scale = T, Chat = NULL, maxPath = 10, doCrossval = T, penalty.factor = rep(1, 
-    ncol(priorMat)), glm_alpha = 0.9, minGenes = 10, tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL, pathwaySelection = c("complete", "fast")) {
+PLIER <- function(data,
+                  priorMat,
+                  svdres = NULL,
+                  k = NULL,
+                  L1 = NULL,
+                  L2 = NULL,
+                  L3 = NULL,
+                  frac = 0.7,
+                  max.iter = 350,
+                  trace = F,
+                  scale = T,
+                  Chat = NULL,
+                  maxPath = 10,
+                  doCrossval = T,
+                  penalty.factor = rep(1, ncol(priorMat)),
+                  glm_alpha = 0.9,
+                  minGenes = 10,
+                  tol = 1e-06,
+                  seed = 123456,
+                  allGenes = F,
+                  rseed = NULL,
+                  pathwaySelection = c("complete", "fast")) {
+    
     pathwaySelection <- match.arg(pathwaySelection, c("complete", "fast"))
     # Ur is the ranked matrix of pathway relevance
+    
     solveU <- function(Z, Chat, C, L3, penalty.factor, glm_alpha) {
         Ur <- Chat %*% Z  # get U by OLS
         Ur <- apply(-Ur, 2, rank)  # rank
@@ -356,18 +378,20 @@ PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
         Y <- data
     }
     
-    if (nrow(priorMat) != nrow(data) || !all(rownames(priorMat) == rownames(data))) {
+    Y <- purgeNAs(Y)
+    
+    if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {
         if (!allGenes) {
-            cm <- commonRows(data, priorMat)
+            cm <- commonRows(Y, priorMat)
             message(paste("Selecting common genes:", length(cm)))
             priorMat <- priorMat[cm, ]
             Y <- Y[cm, ]
         } else {
-            extra.genes <- setdiff(rownames(data), rownames(priorMat))
+            extra.genes <- setdiff(rownames(Y), rownames(priorMat))
             eMat <- matrix(0, nrow = length(extra.genes), ncol = ncol(priorMat))
             rownames(eMat) <- extra.genes
             priorMat <- rbind(priorMat, eMat)
-            priorMat <- priorMat[rownames(data), ]
+            priorMat <- priorMat[rownames(Y), ]
         }
     }
     numGenes <- colSums(priorMat)
@@ -438,7 +462,7 @@ PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
     }
     
     B <- t(svdres$v[1:ncol(Y), 1:k] %*% diag(svdres$d[1:k]))
-    Z <- (as.matrix(Y) %*% t(B)) %*% solve(tcrossprod(B) + L1 * diag(k))
+    Z <- (Y %*% t(B)) %*% solve(tcrossprod(B) + L1 * diag(k))
     Z[Z < 0] <- 0
     if (!is.null(rseed)) {
         message("using random start")
@@ -535,12 +559,12 @@ PLIER <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 = NULL,
             
             U <- solveU(Z, Chat, C, L3, penalty.factor, glm_alpha)
             curfrac <- (npos <- sum(apply(U, 2, max) > 0))/k
-            Z1 <- as.matrix(Y) %*% t(B)
+            Z1 <- Y %*% t(B)
             Z2 <- L1 * C %*% U
             ratio <- median((Z2/Z1)[Z2 > 0 & Z1 > 0])
             Z <- (Z1 + Z2) %*% solve(tcrossprod(B) + L1 * diag(k))
         } else {
-            Z <- (as.matrix(Y) %*% t(B)) %*% solve(tcrossprod(B) + L1 * diag(k))
+            Z <- (Y %*% t(B)) %*% solve(tcrossprod(B) + L1 * diag(k))
         }
         
         Z[Z < 0] <- 0
@@ -1422,4 +1446,20 @@ PLIERsparse <- function(data, priorMat, svdres = NULL, k = NULL, L1 = NULL, L2 =
     out$Zraw <- Zraw
     rownames(out$B) <- nameB(out)
     return(out)
+}
+
+
+#' purgeNAs
+#'
+#' @param Y 
+#'
+#' @return
+#' @export
+#'
+#' @importFrom matrixStats rowSums2
+#'
+purgeNAs <- function(Y){
+    Y <- as.matrix(Y)
+    Y <- Y[which(!rownames(Y) %in% names(which(is.na(rowSums(Y))))),]
+    return(Y)
 }
