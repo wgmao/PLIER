@@ -832,7 +832,7 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
     set.seed(seed)
   }
   warn <- NULL
-  if(class(data)!="list"){
+  if((class(data)!="list")&(class(data)!="rsvd")){
     message("Computing svd")
   n <- ncol(data)
   m <- nrow(data)
