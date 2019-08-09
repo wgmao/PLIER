@@ -892,7 +892,7 @@ num.pc = function (data, method="elbow", B = 20, seed = NULL)
  #plot(x)
  
 
- nsv=which(x<quantile(x, 0.5))[1]+1
+ nsv=which(x<=quantile(x, 0.5))[1]+1
     
   }
   return(nsv)
