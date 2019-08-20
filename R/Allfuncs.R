@@ -380,20 +380,6 @@ PLIER <- function(data,
     
     Y <- purgeNAs(Y)
     
-    if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {
-        if (!allGenes) {
-            cm <- commonRows(Y, priorMat)
-            message(paste("Selecting common genes:", length(cm)))
-            priorMat <- priorMat[cm, ]
-            Y <- Y[cm, ]
-        } else {
-            extra.genes <- setdiff(rownames(Y), rownames(priorMat))
-            eMat <- matrix(0, nrow = length(extra.genes), ncol = ncol(priorMat))
-            rownames(eMat) <- extra.genes
-            priorMat <- rbind(priorMat, eMat)
-            priorMat <- priorMat[rownames(Y), ]
-        }
-    }
     numGenes <- colSums(priorMat)
     
     heldOutGenes <- list()
@@ -415,6 +401,35 @@ PLIER <- function(data,
     } else {
         C <- priorMat
     }
+    
+    keep_module_genes <- C %>%
+        as_tibble(rownames = "gene") %>%
+        gather(-gene, key="module",value="value") %>%
+        group_by(gene) %>%
+        summarise(count = sum(value)) %>%
+        filter(count != 0) %>%
+        pull(gene)
+    C <- C[keep_module_genes, ]
+    priorMat <- priorMat[keep_module_genes, ]
+    
+    if (nrow(priorMat) != nrow(Y) || !all(rownames(priorMat) == rownames(Y))) {
+        if (!allGenes) {
+            cm <- commonRows(Y, priorMat)
+            message(paste("Selecting common genes:", length(cm)))
+            priorMat <- priorMat[cm, ]
+            Y <- Y[cm, ]
+        } else {
+            extra.genes <- setdiff(rownames(Y), rownames(priorMat))
+            eMat <- matrix(0, nrow = length(extra.genes), ncol = ncol(priorMat))
+            rownames(eMat) <- extra.genes
+            priorMat <- rbind(priorMat, eMat)
+            priorMat <- priorMat[rownames(Y), ]
+        }
+    }
+
+    
+    # After crossvalidation, it is possible to have NA or 0 values for a gene.
+    # These need to be removed prior to svd
     
     nc <- ncol(priorMat)
     ng <- nrow(data)
@@ -574,6 +589,8 @@ PLIER <- function(data,
         
         Bdiff <- sum((B - oldB)^2)/sum(B^2)
         BdiffTrace <- c(BdiffTrace, Bdiff)
+        
+        message(str_glue("Z rows: {nrow(Z)} Z cols: {ncol(Z)}\nC rows: {nrow(C)} C cols: {ncol(C)}\nU rows: {nrow(U)} U cols: {ncol(U)}\n C%*%U {ncol(C%*%U)} {nrow(C%*%U)}\n"))
         
         err0 <- sum((Y - Z %*% B)^2) + sum((Z - C %*% U)^2) * L1 + sum(B^2) * L2
         if (trace & i >= iter.full.start) {
