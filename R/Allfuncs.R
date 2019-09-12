@@ -6,7 +6,72 @@ require(rsvd)
 require(qvalue)
 
 
+#' @keywords  internal
+#' Solves for the U coefficients making efficient utilizatoin of the lasso path
+#' @param Z current Z estimate
+#' @param Chat the inverse of the C matrix
+#' @param priorMat the prior pathway or C matrix
+#' @param penalty.factor Penalties for different pathways, must have size ncol(priorMat).  
+#' @param pathwaySelection Method to use for pathway selection. 
+#' @param glm_alpha The elsatic net alpha parameter
+#' @param maxPath The maximum number of pathways to consider
+#' @param target.frac The target fraction on non-zero columns of
+#' @param L3 Solve with a given L3, no search
+solveU=function(Z,  Chat, priorMat, penalty.factor,pathwaySelection="fast", glm_alpha=0.9, maxPath=10, target.frac=0.7, L3=NULL){
+  
+  
+  Ur=Chat%*%Z #get U by OLS
+  Ur=apply(-Ur,2,rank) #rank
+  Urm=apply(Ur,1,min)
+  
+  U=matrix(0,nrow=ncol(priorMat), ncol=ncol(Z))
+  if(is.null(L3)){
 
+    lambdas=exp(seq(-4,-12,-0.125))
+    results=list()
+    lMat=matrix(nrow=length(lambdas), ncol=ncol(Z))
+    for(i in 1:ncol(Z)){
+      if(pathwaySelection=="fast"){
+        iip=which(Ur[,i]<=maxPath)
+      }else{
+        iip=which(Urm<=maxPath)
+      }#else
+      gres=glmnet(y=Z[,i], x=priorMat[,iip], penalty.factor = penalty.factor[iip], alpha=glm_alpha, lower.limits=0, lambda = lambdas,intercept=T,  standardize=F )
+      #plot(gres)
+      gres$iip=iip
+      lMat[,i]=colSums(gres$beta>0)
+      results[[i]]=gres
+    }
+    fracs=rowMeans(lMat>0)
+    iibest=which.min(abs(target.frac-fracs))
+    iibest
+    
+    
+    for(i in 1:ncol(Z)){
+      U[results[[i]]$iip,i]=results[[i]]$beta[,iibest]
+    }#for i
+    rownames(U)=colnames(priorMat)
+    colnames(U)=1:ncol(Z)
+  
+ Utmp=solveU(Z,  Chat, priorMat, penalty.factor,pathwaySelection="fast", glm_alpha=0.9, maxPath=10,  L3=lambdas[iibest])
+ 
+ #stop()
+    return(list(U=U, L3=lambdas[iibest]))  
+  }
+  else{ #do one fit with a given lambda
+    for(i in 1:ncol(Z)){
+      if(pathwaySelection=="fast"){
+        iip=which(Ur[,i]<=maxPath)
+      }else{
+        iip=which(Urm<=maxPath)
+      }#else
+      gres=glmnet(y=Z[,i], x=priorMat[,iip], penalty.factor = penalty.factor[iip], alpha=glm_alpha, lower.limits=0, lambda = L3,intercept=T,  standardize=F )
+      U[iip,i]=as.numeric(gres$beta)
+    }
+   
+    return(U)
+  }
+}
 
 
 #' @keywords  internal
@@ -342,31 +407,7 @@ getAUC=function(plierRes, data, priorMat){
 PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  frac=0.7,  max.iter=350, trace=F, scale=T, Chat=NULL, maxPath=10, doCrossval=T, penalty.factor=rep(1,ncol(priorMat)), glm_alpha=0.9, minGenes=10, tol=1e-6, seed=123456, allGenes=F, rseed=NULL, pathwaySelection=c("complete", "fast")){
   
   pathwaySelection=match.arg(pathwaySelection, c("complete", "fast"))
-  #Ur is the ranked matrix of pathway relevance
-  solveU=function(Z, Chat,C,  L3, penalty.factor, glm_alpha){
-    
-    Ur=Chat%*%Z #get U by OLS
-    Ur=apply(-Ur,2,rank) #rank
-    
-    
-    ii=which(apply(Ur,1,min)<=maxPath)
-    
-    U=copyMat(Ur)
-    U[]=0
-    
-    for (j in 1:ncol(U)){
-      if(pathwaySelection=="fast"){
-        selection=which(Ur[,j]<=maxPath)
-      }
-      else{
-        selection=ii
-      }
-      tmp=glmnet(y=Z[,j], x=C[,selection], alpha=glm_alpha, lambda=L3, lower.limits = 0, penalty.factor = penalty.factor[selection], intercept = F)
-      U[selection,j]=as.numeric(tmp$beta)
-    }
-    
-    return(U)
-  }
+
   
   
   
@@ -451,7 +492,7 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
   }
   if(is.null(k)){
     k=num.pc(svdres)*2
-    k <- min(k, floor(ncol(Y)*0.8))
+    k <- min(k, floor(ncol(Y)*0.9))
     message("k is set to ", k)
   }
   
@@ -519,81 +560,19 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
       
       
       
-      if(i==iter.full & !L3.given){
-        
-        
-        message(paste0("Updating L3, current fraction= ", round(curfrac,4), ", target=", frac))
-        biter=0
-        
-        
-        if(abs(frac-curfrac)>1/k){
-          #set up the limits
-          if(curfrac>frac){
-            #increase penatly
-            if(is.null(L3)){
-              L3_1=0.000001
-              L3_2=1
-            }
-            else{
-              L3_1=L3
-              L3_2=L3*100
-            }
+      if(i==iter.full & !L3.given){ #update L3 to the target fraction
+        Ulist=solveU(Z, Chat, C, penalty.factor, pathwaySelection, glm_alpha, maxPath, target.frac = frac)
+    U=Ulist$U
+    L3=Ulist$L3
+   message(paste("New L3 is", L3))
+   iter.full=iter.full+iter.full.start
           }
-          else{
-            #decrease
-            if(is.null(L3)){
-              
-              L3_1=0.000001
-              L3_2=1
-            }
-            else{
-              L3_1=L3/100
-              L3_2=L3
-            }
-          }
-          
-          
-          while (biter < 150&(biter<1|abs(frac-curfrac)>1/k|npos==0)){
-            
-            U=solveU(Z, Chat, C,  L3=(L3use<-(L3_1+L3_2)/2), penalty.factor, glm_alpha)
-            
-            nposlast=npos
-            curfrac=(npos<-sum(apply(U,2,max)>0))/k
-            if(T){
-              message(paste0(npos, " positive columns at L3=", round(L3use,6)))
-            }
-            if(curfrac>frac){  #increase penatly
-              #check if the limits have been reached
-              if((L3_2-L3_1)<1e-7){
-                L3_2=L3_2*100 
-              }
-              L3_1=(L3_1+L3_2)/2
-            }
-            else{#decrease
-              if((L3_2-L3_1)<1e-7){
-                L3_1=L3_1/100 
-              }
-              L3_2=(L3_1+L3_2)/2
-              
-            }
-            
-            biter=biter+1
-            #show(c(npos, nposlast, frac, curfrac, abs(frac-curfrac), 1/k))
-          }
-          L3=L3use
-          if(trace){
-            message(paste0("L3 is set to ", round(L3, 6), " in ", biter, " iterations"))
-          }
-        }
-        else{
-          message("L3 not changed")
-        }
-        iter.full=iter.full+iter.full.start
+      else{
+      #HERE
+      #solveU=function(Z,  Chat, priorMat, penalty.factor,pathwaySelection="fast", glm_alpha=0.9, maxPath=10, target.frac=0.7, L3=NULL)
+       
+      U=solveU(Z, Chat, C, penalty.factor, pathwaySelection, glm_alpha, maxPath, L3=L3)
       }
-      
-      #find the active pathways
-      
-      U=solveU(Z, Chat, C, L3, penalty.factor, glm_alpha)
       curfrac=(npos<-sum(apply(U,2,max)>0))/k
       Z1=Y%*%t(B)
       Z2=L1*C%*%U
