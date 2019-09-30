@@ -39,6 +39,7 @@ solveU=function(Z,  Chat, priorMat, penalty.factor,pathwaySelection="fast", glm_
       gres=glmnet(y=Z[,i], x=priorMat[,iip], penalty.factor = penalty.factor[iip], alpha=glm_alpha, lower.limits=0, lambda = lambdas,intercept=T,  standardize=F )
       #plot(gres)
       gres$iip=iip
+      print(gres$beta)
       lMat[,i]=colSums(gres$beta>0)
       results[[i]]=gres
     }
