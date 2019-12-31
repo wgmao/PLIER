@@ -2,7 +2,7 @@ Package: PLIER
 Type: Package
 Title: Pathway-Level Information Extractor (PLIER): a generative model for gene expression data
 Version: 0.99.0
-Date: 2017-1-17
+Date: 2019-12-31
 Author: Maria Chikina, Weiguang Mao
 Maintainer: <mchikina@gmail.com>
 Description: Prior information
