@@ -15,6 +15,7 @@ VarianceExplained <- function(Y,Z,B, k=NULL, option = "regression"){
   
   if (option == "regression"){
     #left <- ginv(Y%*%t(Y))%*%Y
+    #B and Z are required
     for (i in 1:k){
       #coef <- left%*%matrix(B[i,], ncol=1)
       coef <- matrix(Z[,i],ncol=1)
@@ -23,11 +24,13 @@ VarianceExplained <- function(Y,Z,B, k=NULL, option = "regression"){
     }#for i
     
   }else if ( option == "matrix_regression"){
+    #only B is required
     for (i in 1:k){
       Zreg <- Y%*%matrix(B[i,],ncol=1)%*%ginv(matrix(B[i,], nrow=1)%*%matrix(B[i,], ncol=1))
       res <- c(res, sum( ( matrix(Zreg,ncol=1)%*%matrix(B[i,],nrow=1)-mean(Y))^2))
     }#for i
   }else if (option == "simple"){
+    #B and Z are required
     Z.norm <- apply(Z,2,normF)
     B.norm <- apply(B,1,normF)
     Z <- sweep(Z,2,Z.norm,"/")
@@ -35,6 +38,7 @@ VarianceExplained <- function(Y,Z,B, k=NULL, option = "regression"){
     res <- (diag(t(Z)%*%Y%*%t(B))[1:k])^2
     
   }else if (option == "project"){
+    #only B is required
     res_temp <- c()
     for (i in 1:k){
       Bk <- matrix(t(B[1:i,]), ncol=i)
