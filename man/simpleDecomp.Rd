@@ -34,7 +34,7 @@
   \item{pos.adj}{Coefficient to adjust L1}
   
   \item{cutoff}{see Zpos}
-  
+  }
 \description{
   PLIER decomposition without prior
 }
