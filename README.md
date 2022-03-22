@@ -25,4 +25,4 @@ Check out the vignette [here](vignettes/vignette.pdf) and you can find avilable 
 Mao, Weiguang, Elena Zaslavsky, Boris M. Hartmann, Stuart C. Sealfon, and Maria Chikina. "Pathway-Level Information ExtractoR (PLIER) for gene expression data." Nature Methods 16, no. 7 (2019): 607.
 
 ## License
-Please refer to `LICENSE.md` for details. If you are interested in using this software for a commercial purpose, please contact the developers.
+Please refer to [LICENSE.md](LICENSE.md) for details. If you are interested in using this software for a commercial purpose, please contact the developers.
