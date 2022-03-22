@@ -1552,9 +1552,11 @@ rotateSVD=function(svdres){
   svdres
 }#rotateSVD
 
+
+
 simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
          Zpos=T,max.iter=200, tol=5e-6, trace=F,
-         rseed=NULL, B=NULL, scale=1, pos.adj=3, cutoff=0){
+         rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.frac=0.05, adaptive.iter=30,  cutoff=0){
   
   
   
@@ -1616,14 +1618,24 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
   
   round2=function(x){signif(x,4)}
   
-  
+  getT=function(x){-quantile(x[x<0], adaptive.frac)}
   
   
   for ( i in 1:max.iter){
     #main loop    
     Zraw=Z=(Y%*%t(B))%*%solve(tcrossprod(B)+L1*diag(k))
     
-    if(Zpos){
+    if(i>=adaptive.iter && adaptive.frac>0){
+      
+      
+      cutoffs=apply(Zraw,2, getT)
+      
+      for(j in 1:ncol(Z)){
+        Z[Z[,j]<cutoffs[j],j]=0
+      }
+    }
+    
+    else if(Zpos){
       Z[Z<cutoff]=0
     }
     
@@ -1649,11 +1661,11 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
       BdiffCount=BdiffCount-1
     }
     
-    if(Bdiff<tol){
+    if(Bdiff<tol &&i>40){
       message(paste0("converged at  iteration ", i))
       break
     }
-    if( BdiffCount>5){
+    if( BdiffCount>5&&i>40){
       message(paste0("stopped at  iteration ", i, " Bdiff is not decreasing"))
       break
     }
@@ -1662,3 +1674,5 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
   rownames(B)=colnames(Z)=paste("LV",1:k)
   return(list(B=B, Z=Z, Zraw=Zraw, L1=L1, L2=L2))
 }#simpleDecomp
+
+
