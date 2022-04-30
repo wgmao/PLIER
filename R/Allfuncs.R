@@ -1642,7 +1642,7 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
     oldB=B
     
     
-    B=solve(t(Z)%*%Z+L2*diag(k))%*%(t(Z)%*%Y)
+    B=solve(crossprod(Z)+L2*diag(k))%*%(t(Z)%*%Y)
     
     
     #update error
@@ -1672,7 +1672,8 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
     
   }
   rownames(B)=colnames(Z)=paste("LV",1:k)
-  return(list(B=B, Z=Z, Zraw=Zraw, L1=L1, L2=L2))
+  Zproject=Z%*%solve(crossprod(Z)+L2*diag(k))
+  return(list(B=B, Z=Z, Zraw=Zraw, Zproject=Zproject,L1=L1, L2=L2))
 }#simpleDecomp
 
 
