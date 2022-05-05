@@ -7,8 +7,8 @@ require(qvalue)
 
 #' @keywords  internal
 #' find the common rows of two data matrices
-#' @param data1 
-#' @param data2
+#' @param data1 first data matrix
+#' @param data2 second data matrix
 commonRows=function(data1, data2){
   intersect(rownames(data1), rownames(data2))
 }
@@ -1566,8 +1566,8 @@ PLIERsparse=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NU
 #' @param adaptive.iter the first iteration where adaptive constants are computed, before they are all 0. 
 #' @export
 simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
-         Zpos=T,max.iter=200, tol=5e-6, trace=F,
-         rseed=NULL, B=NULL, scale=1,  adaptive.frac=0.05, adaptive.iter=30,  cutoff=0){
+         max.iter=200, tol=5e-6, trace=F,
+         rseed=NULL, B=NULL, scale=1,  adaptive.frac=0.05, adaptive.iter=30){
   
   
   pos.adj=3
