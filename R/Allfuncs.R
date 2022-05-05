@@ -5,6 +5,14 @@ require(glmnet)
 require(rsvd)
 require(qvalue)
 
+#' @keywords  internal
+#' find the common rows of two data matrices
+#' @param data1 
+#' @param data2
+commonRows=function(data1, data2){
+  intersect(rownames(data1), rownames(data2))
+}
+
 
 #' @keywords  internal
 #' Solves for the U coefficients making efficient utilizatoin of the lasso path
@@ -942,9 +950,17 @@ plotMat=function(matrix,  scale=T, trim.names=50, cutoff=NULL,col.scale=NULL,...
 }
 
 #' @keywords internal
-tscale=function(mat){
-  t(scale(t(mat)))
+tscale=function(x, zeroNA=T){
+s = apply(x, 1, sd, na.rm=T)
+m = apply(x, 1, mean, na.rm=T)
+x = sweep(x, 1, m)
+x = sweep(x, 1, s, "/")
+if(zeroNA){
+  x[is.na(x)]=0
 }
+x
+}
+
 #' visualize the top genes contributing to the LVs similarily to \code{\link{plotTopZ}}. However in this case all the pathways contributing to each LV are show seperatly. Useful for seeing pathway usage for a single LV or understading the differences between two closely related LVs
 #' 
 #' @param plierRes the result returned by PLIER
@@ -1532,25 +1548,6 @@ PLIERsparse=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NU
 }
 
 
-rotateSVD=function(svdres){
-  sumposu=apply(svdres$u>0,2, sum)
-  sumposv=apply(svdres$v>0,2, sum)
-  
-  sumpos=sumposu+sumposv
-  iibad=which(sumpos==0)
-  if(length(iibad)>0){
-    message("All negative components found")
-    stop()
-  }
-  for(i in 1:ncol(svdres$u)){
-    if(sumposu[i]==0 | sumposv[i]==0){
-      message("flipping")
-      svdres$u[,i]=-svdres$u[,i] 
-      svdres$v[,i]=-svdres$v[,i] 
-    }
-  }
-  svdres
-}#rotateSVD
 
 
 
@@ -1677,3 +1674,39 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
 }#simpleDecomp
 
 
+
+#' @keywords  internal
+#' rotate SVD to maximize the L1  of positive U values
+#' @param svdres a result from a call to svd or rsvd
+rotateSVD=function(svdres){
+  upos=svdres$u
+  uneg=svdres$u
+  upos[upos<0]=0
+  uneg[uneg>=0]=0
+  uneg=-uneg
+  sumposu=colSums(upos)
+  sumnegu=colSums(uneg)
+
+
+  for(i in 1:ncol(svdres$u)){
+    if(sumnegu[i]>sumposu[i]){
+      svdres$u[,i]=-svdres$u[,i] 
+      svdres$v[,i]=-svdres$v[,i] 
+    }
+  }
+  svdres
+}
+
+
+#' @param PLIERres output of PLIER or simpleDecomp
+#' @param newdata new data to project into LV space
+#' @examples
+#' data("dataWholeBlood")
+#' res=simpleDecomp(datain<-tscale(dataWholeBlood), 20)
+#' newB=projectPLIER(res, datain)
+#' @export
+projectPLIER=function(PLIERres, newdata){
+  cm=commonRows(PLIERres$Zproject, newdata)
+  message(paste0(length(cm), " common rows found"))
+t(PLIERres$Zproject[cm,])%*%newdata[cm,]  
+}
