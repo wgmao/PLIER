@@ -1550,12 +1550,27 @@ PLIERsparse=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NU
 
 
 
-
+#' Main PLIER function
+#' 
+#' @param data the data to be processed with genes in rows and samples in columns. Should be z-scored.
+#' @param k The number of latent variables to return, leave as NULL to be set automatically using the num.pc "elbow" method
+#' @param svdres Pre-computed result of the svd decomposition for data.
+#' @param L1 L1 constant, leave as NULL to automatically select a value.
+#' @param L2 L2 constant, leave as NULL to automatically select a value.
+#' @param max.iter maximum number of iterations, default is 200.
+#' @param tol tolerance for relative B change, default is 5e-6.
+#' @param trace print out trace info, default is false.
+#' @param rseed seed for RSVD call. If svdres us given this has no effect.
+#' @param scaleL scale both L1 and L2 by this amount from the default setting. Values less then 1 imply weaker regularization. 
+#' @param adaptive.frac the probability cutoff to use to determine the positive cutoff for loading. Smaller values will return sparser models.
+#' @param adaptive.iter the first iteration where adaptive constants are computed, before they are all 0. 
+#' @export
 simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
          Zpos=T,max.iter=200, tol=5e-6, trace=F,
-         rseed=NULL, B=NULL, scale=1, pos.adj=3, adaptive.frac=0.05, adaptive.iter=30,  cutoff=0){
+         rseed=NULL, B=NULL, scale=1,  adaptive.frac=0.05, adaptive.iter=30,  cutoff=0){
   
   
+  pos.adj=3
   
   ng=nrow(Y)
   ns=ncol(Y)
@@ -1632,8 +1647,8 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
       }
     }
     
-    else if(Zpos){
-      Z[Z<cutoff]=0
+    else{
+      Z[Z<0]=0
     }
     
     oldB=B
