@@ -4,13 +4,32 @@
 \alias{PLIERsparse}
 \title{sparse PLIER function (experimental)}
 \usage{
-PLIERsparse(data, priorMat, svdres = NULL, k = NULL, L1 = NULL,
-  L2 = NULL, L3 = NULL, frac = 0.7, max.iter = 350, trace = F,
-  scale = T, Chat = NULL, maxPath = 10, doCrossval = T,
-  penalty.factor = rep(1, ncol(priorMat)), glm_alpha = 0.9, minGenes = 10,
-  tol = 1e-06, seed = 123456, allGenes = F, rseed = NULL,
-  pathwaySelection = c("complete", "fast"), sparseL = 0.01,
-  sparseType = "SCAD")
+PLIERsparse(
+  data,
+  priorMat,
+  svdres = NULL,
+  k = NULL,
+  L1 = NULL,
+  L2 = NULL,
+  L3 = NULL,
+  frac = 0.7,
+  max.iter = 350,
+  trace = F,
+  scale = T,
+  Chat = NULL,
+  maxPath = 10,
+  doCrossval = T,
+  penalty.factor = rep(1, ncol(priorMat)),
+  glm_alpha = 0.9,
+  minGenes = 10,
+  tol = 1e-06,
+  seed = 123456,
+  allGenes = F,
+  rseed = NULL,
+  pathwaySelection = c("complete", "fast"),
+  sparseL = 0.01,
+  sparseType = "SCAD"
+)
 }
 \arguments{
 \item{data}{the data to be processed with genes in rows and samples in columns. Should be z-scored or set scale=T}

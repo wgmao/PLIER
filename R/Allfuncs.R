@@ -1674,9 +1674,8 @@ simpleDecomp=function(Y, k,svdres=NULL, L1=NULL, L2=NULL,
 }#simpleDecomp
 
 
-
-#' @keywords  internal
 #' rotate SVD to maximize the L1  of positive U values
+#' @keywords  internal
 #' @param svdres a result from a call to svd or rsvd
 rotateSVD=function(svdres){
   upos=svdres$u
@@ -1697,7 +1696,7 @@ rotateSVD=function(svdres){
   svdres
 }
 
-
+#' project a new dataset onto PLIER LVs
 #' @param PLIERres output of PLIER or simpleDecomp
 #' @param newdata new data to project into LV space
 #' @examples

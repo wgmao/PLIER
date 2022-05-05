@@ -4,8 +4,16 @@
 \alias{plotU}
 \title{plot the U matrix from a PLIER decomposition}
 \usage{
-plotU(plierRes, auc.cutoff = 0.6, fdr.cutoff = 0.05, indexCol = NULL,
-  indexRow = NULL, top = 3, sort.row = F, ...)
+plotU(
+  plierRes,
+  auc.cutoff = 0.6,
+  fdr.cutoff = 0.05,
+  indexCol = NULL,
+  indexRow = NULL,
+  top = 3,
+  sort.row = F,
+  ...
+)
 }
 \arguments{
 \item{plierRes}{the result returned by PLIER}

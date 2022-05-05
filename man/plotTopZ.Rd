@@ -4,8 +4,16 @@
 \alias{plotTopZ}
 \title{visualize the top genes contributing to the LVs}
 \usage{
-plotTopZ(plierRes, data, priorMat, top = 10, index = NULL, regress = F,
-  allLVs = F, ...)
+plotTopZ(
+  plierRes,
+  data,
+  priorMat,
+  top = 10,
+  index = NULL,
+  regress = F,
+  allLVs = F,
+  ...
+)
 }
 \arguments{
 \item{plierRes}{the result returned by PLIER}

@@ -4,8 +4,16 @@
 \alias{plotTopZallPath}
 \title{visualize the top genes contributing to the LVs similarily to \code{\link{plotTopZ}}. However in this case all the pathways contributing to each LV are show seperatly. Useful for seeing pathway usage for a single LV or understading the differences between two closely related LVs}
 \usage{
-plotTopZallPath(plierRes, data, priorMat, top = 10, index = NULL,
-  regress = F, fdr.cutoff = 0.2, ...)
+plotTopZallPath(
+  plierRes,
+  data,
+  priorMat,
+  top = 10,
+  index = NULL,
+  regress = F,
+  fdr.cutoff = 0.2,
+  ...
+)
 }
 \arguments{
 \item{plierRes}{the result returned by PLIER}

@@ -7,8 +7,7 @@ Author: Maria Chikina, Weiguang Mao
 Maintainer: <mchikina@gmail.com>
 Description: Prior information
 License: GPL (>=2)
-RoxygenNote: 6.0.1
+RoxygenNote: 7.1.2
 VignetteBuilder: knitr
 biocViews: qvalue
 Depends: RColorBrewer, gplots, pheatmap, glmnet, knitr, rsvd, qvalue
-

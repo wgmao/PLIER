@@ -4,8 +4,14 @@
 \alias{plotMat}
 \title{generic function to plot the non-zero elements of a sparse matrix}
 \usage{
-plotMat(matrix, scale = T, trim.names = 50, cutoff = NULL,
-  col.scale = NULL, ...)
+plotMat(
+  matrix,
+  scale = T,
+  trim.names = 50,
+  cutoff = NULL,
+  col.scale = NULL,
+  ...
+)
 }
 \arguments{
 \item{matrix}{the input matrix}
