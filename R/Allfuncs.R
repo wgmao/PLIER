@@ -521,6 +521,15 @@ PLIER=function(data, priorMat,svdres=NULL, k=NULL, L1=NULL, L2=NULL, L3=NULL,  f
   
   B=t(svdres$v[1:ncol(Y), 1:k]%*%diag(svdres$d[1:k]))
   Z=(Y%*%t(B))%*%solve(tcrossprod(B)+L1*diag(k))
+
+  #avoid all negative loadings
+  for (ii in 1:ncol(Z)){
+    if (all(Z[,ii] <= 0)){
+      Z[,ii] <- -Z[,ii]
+      B[ii,] <- -B[ii,]
+    }#if
+  }#for ii
+  
   Z[Z<0]=0
   if(!is.null(rseed)){
     message("using random start")
